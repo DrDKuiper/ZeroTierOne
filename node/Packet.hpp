@@ -132,10 +132,14 @@
  * If this is set, the packet will have an ephemeral key appended to it its payload
  * will be encrypted with AES-CTR using this ephemeral key and the packet's header
  * as an IV.
- *
- * Note that this is a reuse of a flag that has long been deprecated and ignored.
  */
-#define ZT_PROTO_FLAG_EXTENDED_ARMOR 0x80
+#define ZT_PROTO_FLAG_EXTENDED_ARMOR 0x20
+
+/**
+ * DEPRECATED: This has been replaced by the three-bit cipher suite selection field.
+ * Kept for backward compatibility with pre-1.16 nodes.
+ */
+#define ZT_PROTO_FLAG_ENCRYPTED 0x80
 
 /**
  * Header flag indicating that a packet is fragmented
@@ -1276,6 +1280,12 @@ class Packet : public Buffer<ZT_PROTO_MAX_PACKET_LENGTH> {
 	{
 		unsigned char& b = (*this)[ZT_PACKET_IDX_FLAGS];
 		b = (b & 0xc7) | (unsigned char)((c << 3) & 0x38);	 // bits: FFCCCHHH
+		// Set DEPRECATED "encrypted" flag -- used by pre-1.0.3 peers
+		if (c == ZT_PROTO_CIPHER_SUITE__C25519_POLY1305_SALSA2012) {
+			b |= ZT_PROTO_FLAG_ENCRYPTED;
+		} else {
+			b &= (~ZT_PROTO_FLAG_ENCRYPTED);
+		}
 	}
 
 	/**
