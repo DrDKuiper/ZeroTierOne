@@ -56,6 +56,9 @@
 #include "../version.h"
 #include "OneService.hpp"
 #include "SoftwareUpdater.hpp"
+#include "SecureAPIManager.hpp"
+#include "MFAManager.hpp"
+#include "BandwidthController.hpp"
 
 #include <cpp-httplib/httplib.h>
 
@@ -256,6 +259,77 @@ bool bearerTokenValid(const std::string authHeader, const std::string& checkToke
 	}
 
 	return true;
+}
+
+/**
+ * Enhanced authentication middleware using SecureAPIManager
+ */
+bool authenticateSecureRequest(SecureAPIManager* secureManager, MFAManager* mfaManager, 
+                              const httplib::Request& req, httplib::Response& res,
+                              const std::string& requiredScope, const std::string& legacyToken = "") {
+    std::string clientIP = req.remote_addr;
+    std::string endpoint = req.path;
+    
+    // First check rate limiting
+    if (!secureManager->allowRequest(clientIP, endpoint)) {
+        res.status = 429; // Too Many Requests
+        res.set_content("{\"error\":\"Rate limit exceeded\",\"retry_after\":60}", "application/json");
+        return false;
+    }
+    
+    // Get authorization header
+    std::string authHeader;
+    if (req.has_header("authorization")) {
+        authHeader = req.get_header_value("authorization");
+    } else if (req.has_header("x-zt1-auth")) {
+        authHeader = "Bearer " + req.get_header_value("x-zt1-auth");
+    }
+    
+    // Try secure authentication first
+    if (!authHeader.empty() && secureManager->authenticateRequest(authHeader, clientIP, endpoint, requiredScope)) {
+        // Check if MFA is required for this endpoint
+        std::vector<std::string> mfaRequiredEndpoints = {
+            "/controller/", "/network/", "/unstable/"
+        };
+        
+        bool requiresMFA = false;
+        for (const auto& mfaEndpoint : mfaRequiredEndpoints) {
+            if (endpoint.find(mfaEndpoint) != std::string::npos) {
+                requiresMFA = true;
+                break;
+            }
+        }
+        
+        if (requiresMFA) {
+            std::string clientId = req.get_header_value("x-client-id");
+            if (clientId.empty()) {
+                clientId = clientIP;
+            }
+            
+            if (mfaManager->isMFAEnabled(clientId)) {
+                std::string mfaToken = req.get_header_value("x-mfa-token");
+                if (mfaToken.empty() || !mfaManager->verifyMFAToken(clientId, mfaToken)) {
+                    res.status = 401;
+                    res.set_content("{\"error\":\"MFA token required\",\"mfa_required\":true}", "application/json");
+                    return false;
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+    // Fallback to legacy authentication if provided
+    if (!legacyToken.empty() && !authHeader.empty()) {
+        if (bearerTokenValid(authHeader, legacyToken)) {
+            return true;
+        }
+    }
+    
+    // Authentication failed
+    res.status = 401;
+    res.set_content("{\"error\":\"Authentication required\"}", "application/json");
+    return false;
 }
 
 #if ZT_DEBUG == 1
@@ -947,6 +1021,7 @@ class OneServiceImpl : public OneService {
 	std::string _ssoRedirectURL;
 	SecureAPIManager* _secureAPIManager;
 	MFAManager* _mfaManager;
+	BandwidthController* _bandwidthController;
 
 #ifdef ZT_OPENTELEMETRY_ENABLED
 
@@ -1000,6 +1075,7 @@ class OneServiceImpl : public OneService {
 		, _ssoRedirectURL()
 		, _secureAPIManager(new SecureAPIManager())
 		, _mfaManager(new MFAManager())
+		, _bandwidthController(new BandwidthController())
 #ifdef ZT_OPENTELEMETRY_ENABLED
 		, _traceProvider(nullptr)
 		, _exporterEndpoint()
@@ -1059,6 +1135,7 @@ class OneServiceImpl : public OneService {
 		delete _rc;
 		delete _secureAPIManager;
 		delete _mfaManager;
+		delete _bandwidthController;
 	}
 
 	void setUpMultithreading()
@@ -2860,6 +2937,247 @@ class OneServiceImpl : public OneService {
 		};
 		_controlPlane.Post("/security/bandwidth/policy", bandwidthPolicyPost);
 		_controlPlaneV6.Post("/security/bandwidth/policy", bandwidthPolicyPost);
+
+		// Security token management endpoint
+		auto tokenManagementPost = [&, setContent](const httplib::Request& req, httplib::Response& res) {
+			auto provider = opentelemetry::trace::Provider::GetTracerProvider();
+			auto tracer = provider->GetTracer("http_control_plane");
+			auto span = tracer->StartSpan("http_control_plane::tokenManagement");
+			auto scope = tracer->WithActiveSpan(span);
+
+			std::string client_ip = req.remote_addr;
+			
+			// Enhanced authentication for token management
+			if (!authenticateSecureRequest(_secureAPIManager, _mfaManager, req, res, "security:admin", _authToken)) {
+				return;
+			}
+
+			try {
+				json tokenRequest = json::parse(req.body);
+				std::string action = tokenRequest.value("action", "");
+				
+				json response;
+				if (action == "generate") {
+					std::string scope = tokenRequest.value("scope", "api:read");
+					int expires_in = tokenRequest.value("expires_in", 3600); // 1 hour default
+					
+					// Generate JWT token using SecureAPIManager
+					std::string token = _secureAPIManager->generateToken(client_ip, scope, expires_in);
+					if (!token.empty()) {
+						response["token"] = token;
+						response["scope"] = scope;
+						response["expires_in"] = expires_in;
+						_secureAPIManager->logSecurityEvent("token_generated", 
+														"JWT token generated for scope: " + scope, 
+														SecureAPIManager::SecurityLevel::INFO, client_ip);
+					} else {
+						response["error"] = "Failed to generate token";
+						res.status = 500;
+					}
+				} else if (action == "revoke") {
+					std::string token = tokenRequest.value("token", "");
+					if (!token.empty()) {
+						bool revoked = _secureAPIManager->revokeToken(token);
+						response["revoked"] = revoked;
+						_secureAPIManager->logSecurityEvent("token_revoked", 
+														"JWT token revoked", 
+														SecureAPIManager::SecurityLevel::INFO, client_ip);
+					} else {
+						response["error"] = "Token not provided";
+						res.status = 400;
+					}
+				} else {
+					response["error"] = "Invalid action. Use 'generate' or 'revoke'";
+					res.status = 400;
+				}
+				
+				setContent(req, res, response.dump());
+			} catch (const std::exception& e) {
+				setContent(req, res, "{\"error\":\"Invalid request format\"}");
+				res.status = 400;
+			}
+		};
+		_controlPlane.Post("/security/token", tokenManagementPost);
+		_controlPlaneV6.Post("/security/token", tokenManagementPost);
+
+		// MFA verification endpoint
+		auto mfaVerifyPost = [&, setContent](const httplib::Request& req, httplib::Response& res) {
+			auto provider = opentelemetry::trace::Provider::GetTracerProvider();
+			auto tracer = provider->GetTracer("http_control_plane");
+			auto span = tracer->StartSpan("http_control_plane::mfaVerify");
+			auto scope = tracer->WithActiveSpan(span);
+
+			std::string client_ip = req.remote_addr;
+			
+			try {
+				json mfaRequest = json::parse(req.body);
+				std::string challenge_id = mfaRequest.value("challenge_id", "");
+				std::string code = mfaRequest.value("code", "");
+				
+				json response;
+				if (challenge_id.empty() || code.empty()) {
+					response["error"] = "Challenge ID and code are required";
+					res.status = 400;
+				} else {
+					bool verified = _mfaManager->verifyChallenge(challenge_id, code);
+					response["verified"] = verified;
+					
+					if (verified) {
+						_secureAPIManager->logSecurityEvent("mfa_verified", 
+														"MFA challenge verified successfully", 
+														SecureAPIManager::SecurityLevel::INFO, client_ip);
+					} else {
+						_secureAPIManager->logSecurityEvent("mfa_verify_failed", 
+														"MFA challenge verification failed", 
+														SecureAPIManager::SecurityLevel::WARNING, client_ip);
+					}
+				}
+				
+				setContent(req, res, response.dump());
+			} catch (const std::exception& e) {
+				setContent(req, res, "{\"error\":\"Invalid request format\"}");
+				res.status = 400;
+			}
+		};
+		_controlPlane.Post("/security/mfa/verify", mfaVerifyPost);
+		_controlPlaneV6.Post("/security/mfa/verify", mfaVerifyPost);
+
+		// Bandwidth management endpoint
+		auto bandwidthControlPost = [&, setContent](const httplib::Request& req, httplib::Response& res) {
+			auto provider = opentelemetry::trace::Provider::GetTracerProvider();
+			auto tracer = provider->GetTracer("http_control_plane");
+			auto span = tracer->StartSpan("http_control_plane::bandwidthControl");
+			auto scope = tracer->WithActiveSpan(span);
+
+			std::string client_ip = req.remote_addr;
+			
+			// Enhanced authentication for bandwidth control
+			if (!authenticateSecureRequest(_secureAPIManager, _mfaManager, req, res, "network:admin", _authToken)) {
+				return;
+			}
+
+			try {
+				json bandwidthRequest = json::parse(req.body);
+				std::string network_id = bandwidthRequest.value("network_id", "");
+				std::string peer_id = bandwidthRequest.value("peer_id", "");
+				
+				json response;
+				if (!network_id.empty()) {
+					// Network-level bandwidth control
+					uint64_t upload_limit = bandwidthRequest.value("upload_limit", 0);
+					uint64_t download_limit = bandwidthRequest.value("download_limit", 0);
+					int qos_class = bandwidthRequest.value("qos_class", 0);
+					
+					BandwidthController::BandwidthLimit limit;
+					limit.uploadBytesPerSecond = upload_limit;
+					limit.downloadBytesPerSecond = download_limit;
+					limit.burstAllowanceBytes = bandwidthRequest.value("burst_allowance", 1048576); // 1MB default
+					limit.qosClass = static_cast<BandwidthController::QoSClass>(qos_class);
+					
+					bool result = _bandwidthController->setNetworkBandwidthLimit(network_id, limit);
+					response["network_id"] = network_id;
+					response["bandwidth_configured"] = result;
+					
+					_secureAPIManager->logSecurityEvent("bandwidth_configured", 
+													"Bandwidth limit configured for network: " + network_id, 
+													SecureAPIManager::SecurityLevel::INFO, client_ip);
+				} else if (!peer_id.empty()) {
+					// Peer-level bandwidth control
+					uint64_t upload_limit = bandwidthRequest.value("upload_limit", 0);
+					uint64_t download_limit = bandwidthRequest.value("download_limit", 0);
+					int qos_class = bandwidthRequest.value("qos_class", 0);
+					
+					BandwidthController::BandwidthLimit limit;
+					limit.uploadBytesPerSecond = upload_limit;
+					limit.downloadBytesPerSecond = download_limit;
+					limit.burstAllowanceBytes = bandwidthRequest.value("burst_allowance", 1048576);
+					limit.qosClass = static_cast<BandwidthController::QoSClass>(qos_class);
+					
+					bool result = _bandwidthController->setPeerBandwidthLimit(peer_id, limit);
+					response["peer_id"] = peer_id;
+					response["bandwidth_configured"] = result;
+					
+					_secureAPIManager->logSecurityEvent("bandwidth_configured", 
+													"Bandwidth limit configured for peer: " + peer_id, 
+													SecureAPIManager::SecurityLevel::INFO, client_ip);
+				} else {
+					response["error"] = "Either network_id or peer_id must be provided";
+					res.status = 400;
+				}
+				
+				setContent(req, res, response.dump());
+			} catch (const std::exception& e) {
+				setContent(req, res, "{\"error\":\"Invalid request format\"}");
+				res.status = 400;
+			}
+		};
+		_controlPlane.Post("/security/bandwidth/control", bandwidthControlPost);
+		_controlPlaneV6.Post("/security/bandwidth/control", bandwidthControlPost);
+
+		// Security configuration overview endpoint
+		auto securityOverviewGet = [&, setContent](const httplib::Request& req, httplib::Response& res) {
+			auto provider = opentelemetry::trace::Provider::GetTracerProvider();
+			auto tracer = provider->GetTracer("http_control_plane");
+			auto span = tracer->StartSpan("http_control_plane::securityOverview");
+			auto scope = tracer->WithActiveSpan(span);
+
+			std::string client_ip = req.remote_addr;
+			
+			// Enhanced authentication for security overview
+			if (!authenticateSecureRequest(_secureAPIManager, _mfaManager, req, res, "security:read", _authToken)) {
+				return;
+			}
+
+			json response;
+			
+			// Security API Manager status
+			response["secure_api"] = {
+				{"enabled", true},
+				{"jwt_authentication", true},
+				{"rate_limiting", true},
+				{"reputation_tracking", true}
+			};
+			
+			// MFA Manager status
+			response["mfa"] = {
+				{"enabled", true},
+				{"totp_support", true},
+				{"challenge_based", true}
+			};
+			
+			// Bandwidth Controller status
+			response["bandwidth_control"] = {
+				{"enabled", true},
+				{"qos_classes", 4},
+				{"traffic_shaping", true},
+				{"per_network_limits", true},
+				{"per_peer_limits", true}
+			};
+			
+			// Security metrics
+			response["security_metrics"] = {
+				{"total_security_events", _secureAPIManager->getTotalSecurityEvents()},
+				{"active_jwt_tokens", _secureAPIManager->getActiveTokenCount()},
+				{"rate_limited_ips", _secureAPIManager->getRateLimitedIPs().size()},
+				{"mfa_enabled_clients", _mfaManager->getMFAEnabledClientsCount()}
+			};
+			
+			// System security status
+			response["system_status"] = {
+				{"security_level", "Enhanced"},
+				{"authentication_methods", json::array({"JWT", "Legacy", "MFA"})},
+				{"encryption", "TLS + ZeroTier P2P"},
+				{"audit_logging", true}
+			};
+
+			_secureAPIManager->logSecurityEvent("security_overview", 
+											"Security overview accessed", 
+											SecureAPIManager::SecurityLevel::INFO, client_ip);
+			
+			setContent(req, res, response.dump());
+		};
+		_controlPlane.Get("/security/overview", securityOverviewGet);
+		_controlPlaneV6.Get("/security/overview", securityOverviewGet);
 
 		if (_controller) {
 			_controller->configureHTTPControlPlane(_controlPlane, _controlPlaneV6, setContent);

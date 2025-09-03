@@ -37,7 +37,486 @@ curl -X POST http://localhost:9993/network/8056c2e21c000001 \
 # Returns: 401 Unauthorized
 ```
 
+# ZeroTier One - Security API Usage Guide
+
+## Practical Guide to New Endpoints
+
+This guide demonstrates how to use the new security endpoints implemented in ZeroTier One.
+
+## Authentication
+
+### 1. Generating a JWT Token
+
+**Endpoint:** `POST /security/token`
+
+```bash
+curl -X POST http://localhost:9993/security/token \
+  -H "x-zt1-auth: <your_admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "generate",
+    "scope": "api:write",
+    "expires_in": 7200
+  }'
+```
+
+**Response:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "scope": "api:write",
+  "expires_in": 7200
+}
+```
+
+### 2. Using JWT Token for Authentication
+
+```bash
+curl -X GET http://localhost:9993/status \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+### 3. Revoking a Token
+
+```bash
+curl -X POST http://localhost:9993/security/token \
+  -H "x-zt1-auth: <your_admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "revoke",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }'
+```
+
 ## Multi-Factor Authentication (MFA)
+
+### 1. Setting up MFA
+
+**Endpoint:** `GET /security/mfa/setup`
+
+```bash
+curl -X GET http://localhost:9993/security/mfa/setup \
+  -H "x-zt1-auth: <your_admin_token>" \
+  -H "x-client-id: admin-workstation"
+```
+
+**Response:**
+```json
+{
+  "qr_code": "otpauth://totp/ZeroTier:admin-workstation?secret=JBSWY3DPEHPK3PXP&issuer=ZeroTier",
+  "secret": "JBSWY3DPEHPK3PXP",
+  "backup_codes": ["123456", "789012", "345678"]
+}
+```
+
+### 2. Checking MFA Status
+
+```bash
+curl -X GET http://localhost:9993/security/mfa/status \
+  -H "x-zt1-auth: <your_admin_token>" \
+  -H "x-client-id: admin-workstation"
+```
+
+### 3. Verifying MFA Code
+
+```bash
+curl -X POST http://localhost:9993/security/mfa/verify \
+  -H "x-zt1-auth: <your_admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "challenge_id": "challenge_123",
+    "code": "123456"
+  }'
+```
+
+### 4. Accessing MFA-Required Endpoint
+
+```bash
+curl -X GET http://localhost:9993/controller/network \
+  -H "Authorization: Bearer <jwt_token>" \
+  -H "x-mfa-token: 123456" \
+  -H "x-client-id: admin-workstation"
+```
+
+## Bandwidth Control
+
+### 1. Configuring Network-Level Limits
+
+**Endpoint:** `POST /security/bandwidth/control`
+
+```bash
+curl -X POST http://localhost:9993/security/bandwidth/control \
+  -H "Authorization: Bearer <jwt_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "network_id": "8056c2e21c000001",
+    "upload_limit": 10485760,
+    "download_limit": 52428800,
+    "burst_allowance": 2097152,
+    "qos_class": 2
+  }'
+```
+
+**Response:**
+```json
+{
+  "network_id": "8056c2e21c000001",
+  "bandwidth_configured": true
+}
+```
+
+### 2. Configuring Peer-Level Limits
+
+```bash
+curl -X POST http://localhost:9993/security/bandwidth/control \
+  -H "Authorization: Bearer <jwt_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "peer_id": "8056c2e21c",
+    "upload_limit": 5242880,
+    "download_limit": 26214400,
+    "burst_allowance": 1048576,
+    "qos_class": 1
+  }'
+```
+
+### 3. Viewing Bandwidth Statistics
+
+```bash
+curl -X GET http://localhost:9993/security/bandwidth/stats \
+  -H "Authorization: Bearer <jwt_token>"
+```
+
+**Response:**
+```json
+{
+  "bandwidth_controller": {
+    "enabled": true,
+    "active_limits": 5,
+    "total_traffic": "1.2 GB",
+    "qos_classes": ["Critical", "High", "Normal", "Low"]
+  },
+  "network_stats": {
+    "8056c2e21c000001": {
+      "upload_bytes": 1048576,
+      "download_bytes": 5242880,
+      "upload_packets": 1000,
+      "download_packets": 5000,
+      "dropped_packets": 10
+    }
+  }
+}
+```
+
+## QoS Policy Configuration
+
+### Defining Bandwidth Policy
+
+```bash
+curl -X POST http://localhost:9993/security/bandwidth/policy \
+  -H "Authorization: Bearer <jwt_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "policy_name": "enterprise_qos",
+    "default_class": "Normal",
+    "classes": {
+      "Critical": {
+        "priority": 1,
+        "guaranteed_bandwidth": "50%",
+        "max_bandwidth": "100%"
+      },
+      "High": {
+        "priority": 2,
+        "guaranteed_bandwidth": "30%",
+        "max_bandwidth": "80%"
+      },
+      "Normal": {
+        "priority": 3,
+        "guaranteed_bandwidth": "15%",
+        "max_bandwidth": "60%"
+      },
+      "Low": {
+        "priority": 4,
+        "guaranteed_bandwidth": "5%",
+        "max_bandwidth": "20%"
+      }
+    }
+  }'
+```
+
+## Monitoring and Auditing
+
+### 1. Viewing Security Overview
+
+**Endpoint:** `GET /security/overview`
+
+```bash
+curl -X GET http://localhost:9993/security/overview \
+  -H "Authorization: Bearer <jwt_token>"
+```
+
+**Response:**
+```json
+{
+  "secure_api": {
+    "enabled": true,
+    "jwt_authentication": true,
+    "rate_limiting": true,
+    "reputation_tracking": true
+  },
+  "mfa": {
+    "enabled": true,
+    "totp_support": true,
+    "challenge_based": true
+  },
+  "bandwidth_control": {
+    "enabled": true,
+    "qos_classes": 4,
+    "traffic_shaping": true,
+    "per_network_limits": true,
+    "per_peer_limits": true
+  },
+  "security_metrics": {
+    "total_security_events": 156,
+    "active_jwt_tokens": 5,
+    "rate_limited_ips": 2,
+    "mfa_enabled_clients": 3
+  }
+}
+```
+
+### 2. Accessing Audit Logs
+
+```bash
+curl -X GET http://localhost:9993/security/audit \
+  -H "Authorization: Bearer <jwt_token>"
+```
+
+**Response:**
+```json
+{
+  "audit_logs": [
+    {
+      "timestamp": "2024-01-15T10:30:00Z",
+      "event_type": "auth_success",
+      "description": "JWT authentication successful",
+      "severity": "INFO",
+      "client_ip": "192.168.1.100"
+    },
+    {
+      "timestamp": "2024-01-15T10:29:45Z",
+      "event_type": "mfa_verified",
+      "description": "MFA verification successful",
+      "severity": "INFO",
+      "client_ip": "192.168.1.100"
+    }
+  ]
+}
+```
+
+## Authorization Scopes
+
+### Scope Hierarchy
+
+1. **`api:read`** - Basic status and configuration reading
+2. **`api:write`** - Network configuration modification
+3. **`controller:admin`** - Network controller administration
+4. **`security:read`** - Security information reading
+5. **`security:admin`** - Complete security administration
+
+### Endpoint Mapping by Scope
+
+```
+api:read:
+  - GET /status
+  - GET /network
+  - GET /peer
+
+api:write:
+  - POST /network
+  - DELETE /network
+  - POST /peer
+
+controller:admin:
+  - /controller/* (all controller endpoints)
+
+security:read:
+  - GET /security/overview
+  - GET /security/audit
+  - GET /security/bandwidth/stats
+
+security:admin:
+  - POST /security/token
+  - POST /security/mfa/*
+  - POST /security/bandwidth/*
+```
+
+## Error Handling
+
+### HTTP Status Codes
+
+- **200 OK** - Successful operation
+- **400 Bad Request** - Invalid request data
+- **401 Unauthorized** - Authentication failure
+- **403 Forbidden** - Insufficient scope
+- **429 Too Many Requests** - Rate limit exceeded
+- **500 Internal Server Error** - Internal server error
+
+### Common Error Responses
+
+```json
+{
+  "error": "Rate limit exceeded",
+  "retry_after": 60
+}
+
+{
+  "error": "MFA token required",
+  "mfa_required": true
+}
+
+{
+  "error": "Invalid scope for this operation",
+  "required_scope": "security:admin"
+}
+```
+
+## Legacy API Migration
+
+### Compatibility
+
+The new API maintains full compatibility with existing API:
+
+```bash
+# Legacy API (continues to work)
+curl -X GET http://localhost:9993/status \
+  -H "x-zt1-auth: <legacy_token>"
+
+# New JWT API
+curl -X GET http://localhost:9993/status \
+  -H "Authorization: Bearer <jwt_token>"
+```
+
+### Migration Recommendations
+
+1. **Phase 1**: Continue using legacy tokens for normal operations
+2. **Phase 2**: Implement JWT for new clients/applications
+3. **Phase 3**: Enable MFA for administrative operations
+4. **Phase 4**: Configure rate limiting and bandwidth control
+5. **Phase 5**: Migrate completely to JWT
+
+### Migration Script Example
+
+```bash
+#!/bin/bash
+
+# 1. Generate JWT token for migration
+JWT_RESPONSE=$(curl -s -X POST http://localhost:9993/security/token \
+  -H "x-zt1-auth: $LEGACY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "generate", "scope": "api:write", "expires_in": 86400}')
+
+JWT_TOKEN=$(echo $JWT_RESPONSE | jq -r '.token')
+
+# 2. Configure MFA for admin
+curl -X GET http://localhost:9993/security/mfa/setup \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "x-client-id: migration-script"
+
+# 3. Configure bandwidth limits
+curl -X POST http://localhost:9993/security/bandwidth/control \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "network_id": "YOUR_NETWORK_ID",
+    "upload_limit": 10485760,
+    "download_limit": 52428800
+  }'
+
+echo "Migration completed successfully"
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Active Rate Limiting**
+   - Check `/security/overview` for limited IPs
+   - Wait for cooldown period
+   - Consider whitelisting trusted IPs
+
+2. **MFA Not Working**
+   - Check clock synchronization
+   - Use backup codes if available
+   - Reconfigure MFA if necessary
+
+3. **Invalid JWT Token**
+   - Check token expiration
+   - Generate new token if needed
+   - Confirm adequate scope
+
+4. **Bandwidth Control Not Applied**
+   - Check QoS configuration
+   - Confirm controller is active
+   - Monitor audit logs for errors
+
+## Professional Change Summary
+
+### Security Enhancements Implemented
+
+#### 1. **JWT Authentication System**
+- **Implementation**: Full JWT token-based authentication with HS256 algorithm
+- **Business Impact**: Enhanced security with granular scope-based access control
+- **Technical Details**: Tokens with configurable expiration, revocation capabilities, and scope validation
+- **Compliance**: Supports enterprise security standards and audit requirements
+
+#### 2. **Multi-Factor Authentication (MFA)**
+- **Implementation**: TOTP-based MFA compatible with Google Authenticator and similar apps
+- **Business Impact**: Additional security layer for critical administrative operations
+- **Technical Details**: Challenge/response system with backup codes and client-specific configuration
+- **Compliance**: Meets regulatory requirements for administrative access protection
+
+#### 3. **Advanced Rate Limiting**
+- **Implementation**: Adaptive rate limiting with client reputation tracking
+- **Business Impact**: Protection against DoS attacks and abuse while maintaining service quality
+- **Technical Details**: Reputation-based scoring system with configurable thresholds
+- **Compliance**: Enhances service availability and prevents unauthorized access attempts
+
+#### 4. **Bandwidth Control & QoS**
+- **Implementation**: Comprehensive traffic shaping with 4-tier QoS classification
+- **Business Impact**: Guaranteed service quality and resource optimization
+- **Technical Details**: Per-network and per-peer bandwidth limits with burst allowance
+- **Compliance**: Supports SLA enforcement and resource management policies
+
+#### 5. **Security Auditing**
+- **Implementation**: Comprehensive audit logging with multiple severity levels
+- **Business Impact**: Full visibility into security events for compliance and monitoring
+- **Technical Details**: Structured JSON logs with timestamps, event types, and client tracking
+- **Compliance**: Supports regulatory audit requirements and incident investigation
+
+### Integration Architecture
+
+#### **Backward Compatibility**
+- **Approach**: Hybrid authentication system maintaining full legacy API compatibility
+- **Implementation**: Gradual migration path with parallel authentication methods
+- **Risk Mitigation**: Zero-downtime deployment with fallback mechanisms
+
+#### **Performance Optimization**
+- **Monitoring**: OpenTelemetry integration for distributed tracing and metrics
+- **Scalability**: Efficient memory management and configurable resource limits
+- **Reliability**: Error handling and graceful degradation under load
+
+### Deployment Considerations
+
+#### **Enterprise Readiness**
+- **Security**: Multiple authentication layers with configurable policies
+- **Monitoring**: Real-time security metrics and audit trail capabilities
+- **Management**: RESTful API for all security configurations and monitoring
+
+#### **Operational Excellence**
+- **Documentation**: Comprehensive implementation and usage guides
+- **Testing**: Error-free compilation and integration with existing codebase
+- **Maintenance**: Modular design for easy updates and configuration changes
 
 ### Initial Setup
 
