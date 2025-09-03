@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZeroTier Management Console</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .header h1 {
+            color: #4a5568;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+        
+        .header p {
+            color: #718096;
+            font-size: 1.1em;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .card h3 {
+            color: #4a5568;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #48bb78;
+        }
+        
+        .status-indicator.offline {
+            background: #f56565;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .metric:last-child {
+            border-bottom: none;
+        }
+        
+        .metric-value {
+            font-weight: 600;
+            color: #2d3748;
+        }
+        
+        .networks-table {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        th {
+            background: #f7fafc;
+            font-weight: 600;
+            color: #4a5568;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+        }
+        
+        .icon {
+            font-size: 1.2em;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #718096;
+        }
+        
+        .error {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌐 ZeroTier Management Console</h1>
+            <p>Gestão Profissional de Redes Virtuais</p>
+        </div>
+        
+        <div class="dashboard">
+            <div class="card">
+                <h3>
+                    <span class="status-indicator" id="status-indicator"></span>
+                    Status do Serviço
+                </h3>
+                <div class="metric">
+                    <span>Estado:</span>
+                    <span class="metric-value" id="service-status">Carregando...</span>
+                </div>
+                <div class="metric">
+                    <span>Versão:</span>
+                    <span class="metric-value" id="version">-</span>
+                </div>
+                <div class="metric">
+                    <span>Node ID:</span>
+                    <span class="metric-value" id="node-id">-</span>
+                </div>
+                <div class="metric">
+                    <span>Endereço:</span>
+                    <span class="metric-value" id="address">-</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>📊 Estatísticas</h3>
+                <div class="metric">
+                    <span>Redes Ativas:</span>
+                    <span class="metric-value" id="network-count">0</span>
+                </div>
+                <div class="metric">
+                    <span>Peers Conectados:</span>
+                    <span class="metric-value" id="peer-count">0</span>
+                </div>
+                <div class="metric">
+                    <span>Uptime:</span>
+                    <span class="metric-value" id="uptime">-</span>
+                </div>
+                <div class="metric">
+                    <span>Porta Principal:</span>
+                    <span class="metric-value" id="primary-port">-</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>⚙️ Ações Rápidas</h3>
+                <button class="btn" onclick="refreshData()">🔄 Atualizar</button>
+                <button class="btn" onclick="openJoinNetworkModal()" style="margin-top: 10px;">➕ Entrar em Rede</button>
+                <button class="btn btn-danger" onclick="stopService()" style="margin-top: 10px;">⏹️ Parar Serviço</button>
+            </div>
+        </div>
+        
+        <div class="networks-table">
+            <h3>🌐 Redes Conectadas</h3>
+            <div id="networks-loading" class="loading">Carregando redes...</div>
+            <div id="networks-error" class="error" style="display: none;"></div>
+            <table id="networks-table" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>ID da Rede</th>
+                        <th>Nome</th>
+                        <th>Status</th>
+                        <th>IP Atribuído</th>
+                        <th>Tipo</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="networks-tbody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Configuração da API
+        const API_BASE = 'http://localhost:9993';
+        let authToken = '';
+
+        // Buscar token de autenticação
+        async function getAuthToken() {
+            try {
+                // Em um ambiente real, o token seria obtido de forma segura
+                // Por agora, assumimos que está configurado
+                authToken = 'your-auth-token-here';
+                return true;
+            } catch (error) {
+                console.error('Erro ao obter token:', error);
+                return false;
+            }
+        }
+
+        // Fazer requisição para a API
+        async function apiRequest(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    ...options,
+                    headers: {
+                        'X-ZT1-Auth': authToken,
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Erro na API:', error);
+                throw error;
+            }
+        }
+
+        // Carregar status do serviço
+        async function loadStatus() {
+            try {
+                const status = await apiRequest('/status');
+                
+                document.getElementById('service-status').textContent = 'Online';
+                document.getElementById('status-indicator').classList.remove('offline');
+                document.getElementById('version').textContent = status.version || '-';
+                document.getElementById('node-id').textContent = status.address || '-';
+                document.getElementById('address').textContent = status.address || '-';
+                document.getElementById('primary-port').textContent = status.config?.settings?.primaryPort || '-';
+                
+                // Calcular uptime
+                if (status.clock) {
+                    const uptime = Math.floor((Date.now() - status.clock) / 1000);
+                    document.getElementById('uptime').textContent = formatUptime(uptime);
+                }
+                
+            } catch (error) {
+                document.getElementById('service-status').textContent = 'Offline';
+                document.getElementById('status-indicator').classList.add('offline');
+                console.error('Erro ao carregar status:', error);
+            }
+        }
+
+        // Carregar redes
+        async function loadNetworks() {
+            try {
+                const networks = await apiRequest('/network');
+                const peers = await apiRequest('/peer');
+                
+                document.getElementById('network-count').textContent = networks.length;
+                document.getElementById('peer-count').textContent = peers.length;
+                
+                const tbody = document.getElementById('networks-tbody');
+                tbody.innerHTML = '';
+                
+                networks.forEach(network => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${network.id}</td>
+                        <td>${network.name || 'Sem nome'}</td>
+                        <td>
+                            <span style="color: ${network.status === 'OK' ? '#48bb78' : '#f56565'}">
+                                ${network.status || 'Desconhecido'}
+                            </span>
+                        </td>
+                        <td>${(network.assignedAddresses || []).join(', ') || '-'}</td>
+                        <td>${network.type || 'Privada'}</td>
+                        <td>
+                            <button class="btn btn-danger" onclick="leaveNetwork('${network.id}')">
+                                Sair
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                
+                document.getElementById('networks-loading').style.display = 'none';
+                document.getElementById('networks-table').style.display = 'table';
+                
+            } catch (error) {
+                document.getElementById('networks-loading').style.display = 'none';
+                document.getElementById('networks-error').style.display = 'block';
+                document.getElementById('networks-error').textContent = 'Erro ao carregar redes: ' + error.message;
+            }
+        }
+
+        // Atualizar dados
+        async function refreshData() {
+            await loadStatus();
+            await loadNetworks();
+        }
+
+        // Entrar em uma rede
+        function openJoinNetworkModal() {
+            const networkId = prompt('Digite o ID da rede para entrar:');
+            if (networkId && networkId.length === 16) {
+                joinNetwork(networkId);
+            } else if (networkId) {
+                alert('ID da rede deve ter 16 caracteres hexadecimais');
+            }
+        }
+
+        async function joinNetwork(networkId) {
+            try {
+                await apiRequest(`/network/${networkId}`, { method: 'POST' });
+                alert('Conectado à rede com sucesso!');
+                await refreshData();
+            } catch (error) {
+                alert('Erro ao conectar à rede: ' + error.message);
+            }
+        }
+
+        // Sair de uma rede
+        async function leaveNetwork(networkId) {
+            if (confirm('Tem certeza que deseja sair desta rede?')) {
+                try {
+                    await apiRequest(`/network/${networkId}`, { method: 'DELETE' });
+                    alert('Desconectado da rede com sucesso!');
+                    await refreshData();
+                } catch (error) {
+                    alert('Erro ao sair da rede: ' + error.message);
+                }
+            }
+        }
+
+        // Parar serviço (simulado)
+        function stopService() {
+            if (confirm('Tem certeza que deseja parar o serviço ZeroTier?')) {
+                alert('Esta funcionalidade seria implementada com privilégios administrativos');
+            }
+        }
+
+        // Formatar tempo de uptime
+        function formatUptime(seconds) {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            
+            if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            return `${minutes}m`;
+        }
+
+        // Inicializar aplicação
+        async function init() {
+            if (await getAuthToken()) {
+                await refreshData();
+                // Atualizar dados a cada 30 segundos
+                setInterval(refreshData, 30000);
+            } else {
+                document.getElementById('networks-error').style.display = 'block';
+                document.getElementById('networks-error').textContent = 'Erro de autenticação. Verifique a configuração.';
+            }
+        }
+
+        // Iniciar quando a página carregar
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
