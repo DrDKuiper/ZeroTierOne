@@ -19,6 +19,9 @@
 
 namespace ZeroTier {
 
+class SecureAPIManager;
+class MFAManager;
+
 #ifdef ZT_SDK
 class VirtualTap;
 // Use the virtual libzt endpoint instead of a tun/tap port driver

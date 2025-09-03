@@ -142,6 +142,8 @@ using json = nlohmann::json;
 #include "../controller/PostgreSQL.hpp"
 #include "../controller/Redis.hpp"
 #include "../osdep/EthernetTap.hpp"
+#include "SecureAPIManager.hpp"
+#include "MFAManager.hpp"
 #ifdef __WINDOWS__
 #include "../osdep/WindowsEthernetTap.hpp"
 #endif
@@ -943,6 +945,8 @@ class OneServiceImpl : public OneService {
 
 	RedisConfig* _rc;
 	std::string _ssoRedirectURL;
+	SecureAPIManager* _secureAPIManager;
+	MFAManager* _mfaManager;
 
 #ifdef ZT_OPENTELEMETRY_ENABLED
 
@@ -994,6 +998,8 @@ class OneServiceImpl : public OneService {
 		, _run(true)
 		, _rc(NULL)
 		, _ssoRedirectURL()
+		, _secureAPIManager(new SecureAPIManager())
+		, _mfaManager(new MFAManager())
 #ifdef ZT_OPENTELEMETRY_ENABLED
 		, _traceProvider(nullptr)
 		, _exporterEndpoint()
@@ -1051,6 +1057,8 @@ class OneServiceImpl : public OneService {
 #endif
 		delete _controller;
 		delete _rc;
+		delete _secureAPIManager;
+		delete _mfaManager;
 	}
 
 	void setUpMultithreading()
@@ -1883,26 +1891,48 @@ class OneServiceImpl : public OneService {
 			auto span = tracer->StartSpan("http_control_plane::authCheck");
 			auto scope = tracer->WithActiveSpan(span);
 
+			std::string client_ip = req.remote_addr;
+			
 			if (req.path == "/metrics") {
 				auto mspan = tracer->StartSpan("http_control_plane::metricsAuth");
 				auto mscope = tracer->WithActiveSpan(mspan);
+				
+				bool metricsAuth = false;
 				if (req.has_header("x-zt1-auth")) {
 					std::string token = req.get_header_value("x-zt1-auth");
 					if (token == _metricsToken || token == _authToken) {
-						return httplib::Server::HandlerResponse::Unhandled;
+						metricsAuth = true;
 					}
 				}
 				else if (req.has_param("auth")) {
 					std::string token = req.get_param_value("auth");
 					if (token == _metricsToken || token == _authToken) {
-						return httplib::Server::HandlerResponse::Unhandled;
+						metricsAuth = true;
 					}
 				}
 				else if (req.has_header("authorization")) {
 					std::string auth = req.get_header_value("authorization");
 					if (bearerTokenValid(auth, _metricsToken) || bearerTokenValid(auth, _authToken)) {
-						return httplib::Server::HandlerResponse::Unhandled;
+						metricsAuth = true;
 					}
+				}
+
+				if (metricsAuth) {
+					// Check rate limiting for metrics
+					if (_secureAPIManager->allowRequest(client_ip, "metrics")) {
+						_secureAPIManager->logSecurityEvent("metrics_access", 
+														"Metrics endpoint accessed", 
+														SecureAPIManager::SecurityLevel::INFO, client_ip);
+						return httplib::Server::HandlerResponse::Unhandled;
+					} else {
+						_secureAPIManager->logSecurityEvent("metrics_rate_limited", 
+														"Metrics access rate limited", 
+														SecureAPIManager::SecurityLevel::WARNING, client_ip);
+					}
+				} else {
+					_secureAPIManager->logSecurityEvent("metrics_auth_failed", 
+													"Unauthorized metrics access attempt", 
+													SecureAPIManager::SecurityLevel::WARNING, client_ip);
 				}
 
 				span->SetAttribute("auth", "failed");
@@ -1911,12 +1941,12 @@ class OneServiceImpl : public OneService {
 				return httplib::Server::HandlerResponse::Handled;
 			}
 			else {
-				std::string r = req.remote_addr;
-				InetAddress remoteAddr(r.c_str());
+				InetAddress remoteAddr(client_ip.c_str());
 
 				bool ipAllowed = false;
 				bool isAuth = false;
-				// If localhost, allow
+				
+				// Check IP allowlist
 				if (remoteAddr.ipScope() == InetAddress::IP_SCOPE_LOOPBACK) {
 					ipAllowed = true;
 				}
@@ -1931,7 +1961,7 @@ class OneServiceImpl : public OneService {
 				}
 
 				if (ipAllowed) {
-					// auto-pass endpoints in `noAuthEndpoints`.  No auth token required
+					// Check if endpoint requires no authentication
 					if (std::find(noAuthEndpoints.begin(), noAuthEndpoints.end(), req.path) != noAuthEndpoints.end()) {
 						isAuth = true;
 					}
@@ -1942,22 +1972,87 @@ class OneServiceImpl : public OneService {
 					}
 
 					if (! isAuth) {
-						// check auth token
-						if (req.has_header("x-zt1-auth")) {
-							std::string token = req.get_header_value("x-zt1-auth");
-							if (token == _authToken) {
-								isAuth = true;
-							}
+						// Use enhanced authentication system
+						std::string auth_header;
+						std::string required_scope = "api:read";
+						
+						if (req.method == "POST" || req.method == "PUT" || req.method == "DELETE") {
+							required_scope = "api:write";
+						}
+						if (req.path.find("/controller") != std::string::npos) {
+							required_scope = "controller:admin";
+						}
+
+						// Try different auth header formats
+						if (req.has_header("authorization")) {
+							auth_header = req.get_header_value("authorization");
+						}
+						else if (req.has_header("x-zt1-auth")) {
+							auth_header = "Bearer " + req.get_header_value("x-zt1-auth");
 						}
 						else if (req.has_param("auth")) {
-							std::string token = req.get_param_value("auth");
-							if (token == _authToken) {
-								isAuth = true;
+							auth_header = "Bearer " + req.get_param_value("auth");
+						}
+
+						// Check if MFA is required for this endpoint
+						if (_mfaManager->requiresMFA(req.path)) {
+							std::string mfa_challenge_id = req.get_header_value("x-zt1-mfa-challenge");
+							std::string mfa_code = req.get_header_value("x-zt1-mfa-code");
+							
+							if (mfa_challenge_id.empty() || mfa_code.empty()) {
+								// Generate MFA challenge
+								std::string client_id = client_ip; // Use IP as client ID for now
+								std::string challenge_id = _mfaManager->generateChallenge(client_id, req.path);
+								
+								if (!challenge_id.empty()) {
+									res.set_header("x-zt1-mfa-challenge", challenge_id);
+									res.set_header("x-zt1-mfa-required", "true");
+									setContent(req, res, "{\"error\":\"MFA required\",\"mfa_challenge\":\"" + challenge_id + "\"}");
+									res.status = 401;
+									return httplib::Server::HandlerResponse::Handled;
+								}
+							} else {
+								// Verify MFA challenge
+								if (!_mfaManager->verifyChallenge(mfa_challenge_id, mfa_code)) {
+									_secureAPIManager->logSecurityEvent("mfa_failed", 
+																	"MFA verification failed for " + req.path, 
+																	SecureAPIManager::SecurityLevel::WARNING, client_ip);
+									setContent(req, res, "{\"error\":\"Invalid MFA code\"}");
+									res.status = 401;
+									return httplib::Server::HandlerResponse::Handled;
+								}
+								_secureAPIManager->logSecurityEvent("mfa_success", 
+																"MFA verification successful for " + req.path, 
+																SecureAPIManager::SecurityLevel::INFO, client_ip);
 							}
 						}
-						else if (req.has_header("authorization")) {
-							std::string auth = req.get_header_value("authorization");
-							isAuth = bearerTokenValid(auth, _authToken);
+
+						// Enhanced authentication check
+						if (_secureAPIManager->authenticateRequest(auth_header, client_ip, req.path, required_scope)) {
+							isAuth = true;
+							span->SetAttribute("auth_method", "enhanced");
+						} else {
+							// Fallback to legacy authentication for compatibility
+							if (req.has_header("x-zt1-auth")) {
+								std::string token = req.get_header_value("x-zt1-auth");
+								if (token == _authToken) {
+									isAuth = true;
+									span->SetAttribute("auth_method", "legacy");
+									_secureAPIManager->logSecurityEvent("legacy_auth_used", 
+																	"Legacy authentication method used", 
+																	SecureAPIManager::SecurityLevel::INFO, client_ip);
+								}
+							}
+							else if (req.has_param("auth")) {
+								std::string token = req.get_param_value("auth");
+								if (token == _authToken) {
+									isAuth = true;
+									span->SetAttribute("auth_method", "legacy");
+									_secureAPIManager->logSecurityEvent("legacy_auth_used", 
+																	"Legacy authentication method used", 
+																	SecureAPIManager::SecurityLevel::INFO, client_ip);
+								}
+							}
 						}
 					}
 				}
@@ -1969,6 +2064,9 @@ class OneServiceImpl : public OneService {
 				}
 
 				span->SetAttribute("auth", "failed");
+				_secureAPIManager->logSecurityEvent("auth_failed", 
+												"API authentication failed", 
+												SecureAPIManager::SecurityLevel::WARNING, client_ip);
 				setContent(req, res, "{}");
 				res.status = 401;
 				return httplib::Server::HandlerResponse::Handled;
@@ -2621,6 +2719,147 @@ class OneServiceImpl : public OneService {
 		};
 		_controlPlane.set_exception_handler(exceptionHandler);
 		_controlPlaneV6.set_exception_handler(exceptionHandler);
+
+		// Security Management Endpoints
+		
+		// MFA Management
+		auto mfaSetupGet = [&, setContent](const httplib::Request& req, httplib::Response& res) {
+			auto provider = opentelemetry::trace::Provider::GetTracerProvider();
+			auto tracer = provider->GetTracer("http_control_plane");
+			auto span = tracer->StartSpan("http_control_plane::mfaSetupGet");
+			auto scope = tracer->WithActiveSpan(span);
+
+			std::string clientId = req.get_header_value("x-client-id");
+			if (clientId.empty()) {
+				clientId = req.remote_addr;
+			}
+
+			if (!_mfaManager->isMFAEnabled(clientId)) {
+				if (_mfaManager->initializeMFA(clientId, "")) {
+					std::string setupInfo = _mfaManager->getMFASetupInfo(clientId);
+					json response;
+					response["mfa_enabled"] = true;
+					response["setup_uri"] = setupInfo;
+					response["message"] = "MFA has been initialized. Please configure your authenticator app.";
+					setContent(req, res, response.dump());
+				} else {
+					setContent(req, res, "{\"error\":\"Failed to initialize MFA\"}");
+					res.status = 500;
+				}
+			} else {
+				setContent(req, res, "{\"mfa_enabled\":true,\"message\":\"MFA is already enabled\"}");
+			}
+		};
+		_controlPlane.Get("/security/mfa/setup", mfaSetupGet);
+		_controlPlaneV6.Get("/security/mfa/setup", mfaSetupGet);
+
+		auto mfaStatusGet = [&, setContent](const httplib::Request& req, httplib::Response& res) {
+			auto provider = opentelemetry::trace::Provider::GetTracerProvider();
+			auto tracer = provider->GetTracer("http_control_plane");
+			auto span = tracer->StartSpan("http_control_plane::mfaStatusGet");
+			auto scope = tracer->WithActiveSpan(span);
+
+			std::string clientId = req.get_header_value("x-client-id");
+			if (clientId.empty()) {
+				clientId = req.remote_addr;
+			}
+
+			json response;
+			response["client_id"] = clientId;
+			response["mfa_enabled"] = _mfaManager->isMFAEnabled(clientId);
+			setContent(req, res, response.dump());
+		};
+		_controlPlane.Get("/security/mfa/status", mfaStatusGet);
+		_controlPlaneV6.Get("/security/mfa/status", mfaStatusGet);
+
+		// Security Token Management
+		auto tokenGeneratePost = [&, setContent](const httplib::Request& req, httplib::Response& res) {
+			auto provider = opentelemetry::trace::Provider::GetTracerProvider();
+			auto tracer = provider->GetTracer("http_control_plane");
+			auto span = tracer->StartSpan("http_control_plane::tokenGeneratePost");
+			auto scope = tracer->WithActiveSpan(span);
+
+			try {
+				json requestData = json::parse(req.body);
+				std::string clientId = requestData.value("client_id", req.remote_addr);
+				std::vector<std::string> scopes = requestData.value("scopes", std::vector<std::string>{"api:read"});
+
+				std::string token = _secureAPIManager->generateSecureToken(clientId, scopes);
+				if (!token.empty()) {
+					json response;
+					response["token"] = token;
+					response["client_id"] = clientId;
+					response["scopes"] = scopes;
+					response["expires_in"] = 3600; // 1 hour
+					setContent(req, res, response.dump());
+				} else {
+					setContent(req, res, "{\"error\":\"Failed to generate token\"}");
+					res.status = 500;
+				}
+			} catch (const std::exception& e) {
+				setContent(req, res, "{\"error\":\"Invalid request body\"}");
+				res.status = 400;
+			}
+		};
+		_controlPlane.Post("/security/token", tokenGeneratePost);
+		_controlPlaneV6.Post("/security/token", tokenGeneratePost);
+
+		// Security Audit Logs
+		auto auditLogsGet = [&, setContent](const httplib::Request& req, httplib::Response& res) {
+			auto provider = opentelemetry::trace::Provider::GetTracerProvider();
+			auto tracer = provider->GetTracer("http_control_plane");
+			auto span = tracer->StartSpan("http_control_plane::auditLogsGet");
+			auto scope = tracer->WithActiveSpan(span);
+
+			std::string level = req.get_param_value("level");
+			std::string since = req.get_param_value("since");
+			int limit = std::stoi(req.get_param_value("limit").empty() ? "100" : req.get_param_value("limit"));
+
+			// For now, return a sample structure - in production, this would query the actual audit logs
+			json response;
+			response["logs"] = json::array();
+			response["total"] = 0;
+			response["message"] = "Audit logs endpoint - implementation pending full audit system";
+			setContent(req, res, response.dump());
+		};
+		_controlPlane.Get("/security/audit", auditLogsGet);
+		_controlPlaneV6.Get("/security/audit", auditLogsGet);
+
+		// Bandwidth Management Endpoints
+		auto bandwidthStatsGet = [&, setContent](const httplib::Request& req, httplib::Response& res) {
+			auto provider = opentelemetry::trace::Provider::GetTracerProvider();
+			auto tracer = provider->GetTracer("http_control_plane");
+			auto span = tracer->StartSpan("http_control_plane::bandwidthStatsGet");
+			auto scope = tracer->WithActiveSpan(span);
+
+			// For now, return placeholder data - would integrate with actual BandwidthController
+			json response;
+			response["networks"] = json::array();
+			response["message"] = "Bandwidth management system ready for integration";
+			setContent(req, res, response.dump());
+		};
+		_controlPlane.Get("/security/bandwidth/stats", bandwidthStatsGet);
+		_controlPlaneV6.Get("/security/bandwidth/stats", bandwidthStatsGet);
+
+		auto bandwidthPolicyPost = [&, setContent](const httplib::Request& req, httplib::Response& res) {
+			auto provider = opentelemetry::trace::Provider::GetTracerProvider();
+			auto tracer = provider->GetTracer("http_control_plane");
+			auto span = tracer->StartSpan("http_control_plane::bandwidthPolicyPost");
+			auto scope = tracer->WithActiveSpan(span);
+
+			try {
+				json policyData = json::parse(req.body);
+				json response;
+				response["message"] = "Bandwidth policy configuration endpoint ready";
+				response["received_policy"] = policyData;
+				setContent(req, res, response.dump());
+			} catch (const std::exception& e) {
+				setContent(req, res, "{\"error\":\"Invalid policy data\"}");
+				res.status = 400;
+			}
+		};
+		_controlPlane.Post("/security/bandwidth/policy", bandwidthPolicyPost);
+		_controlPlaneV6.Post("/security/bandwidth/policy", bandwidthPolicyPost);
 
 		if (_controller) {
 			_controller->configureHTTPControlPlane(_controlPlane, _controlPlaneV6, setContent);
