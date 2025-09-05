@@ -37,6 +37,8 @@ target_include_directories(zerotier-one PRIVATE
     ${PROJ_DIR}/node
     ${PROJ_DIR}/osdep
     ${PROJ_DIR}/service
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/opentelemetry-cpp/api/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/opentelemetry-cpp/sdk/include"
 )
 
 # Optional GUI
