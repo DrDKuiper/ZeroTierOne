@@ -6,8 +6,15 @@ echo Building ZeroTier One GUI for Windows...
 REM Check if Qt6 is installed
 where qmake >nul 2>nul
 if %ERRORLEVEL% NEQ 0 (
-    echo Qt6 not found in PATH. Please install Qt6 and add it to your PATH.
-    exit /b 1
+    if defined Qt6_DIR (
+        echo Qt6 found via Qt6_DIR environment variable: %Qt6_DIR%
+        set PATH=%Qt6_DIR%\bin;%PATH%
+    ) else (
+        echo Qt6 not found in PATH and Qt6_DIR not set. Please install Qt6 and add it to your PATH.
+        exit /b 1
+    )
+) else (
+    echo Qt6 found in PATH
 )
 
 REM Check if CMake is installed

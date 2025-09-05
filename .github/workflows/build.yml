@@ -241,10 +241,13 @@ jobs:
           echo "Installing CMake..."
           brew install cmake
         fi
-        
-        # Install Qt6
-        echo "Installing Qt6..."
-        brew install qt6
+    
+    - name: Install Qt6
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.5.0'
+        host: 'mac'
+        target: 'desktop'
     
     - name: Install Rust aarch64
       uses: dtolnay/rust-toolchain@stable
@@ -318,7 +321,7 @@ jobs:
         host: 'windows'
         target: 'desktop'
         arch: 'win64_msvc2019_64'
-        modules: 'qtbase qttools'
+        tools: 'tools_cmake'
     
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable

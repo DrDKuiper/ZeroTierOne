@@ -17,8 +17,8 @@ target_compile_options(zerotiercore PRIVATE ${ZT_DEFS})
 target_include_directories(zerotiercore PUBLIC 
     ${PROJ_DIR}/include
     ${PROJ_DIR}/ext
-    ${PROJ_DIR}/ext/prometheus-cpp-lite-1.0/core/include
     ${PROJ_DIR}/ext/prometheus-cpp-lite-1.0/simpleapi/include
+    ${PROJ_DIR}/ext/prometheus-cpp-lite-1.0/core/include
     ${PROJ_DIR}/node
     ${PROJ_DIR}/osdep
     ${PROJ_DIR}/service
@@ -32,8 +32,8 @@ target_compile_options(zerotier-one PRIVATE ${ZT_DEFS})
 target_include_directories(zerotier-one PRIVATE 
     ${PROJ_DIR}/include
     ${PROJ_DIR}/ext
-    ${PROJ_DIR}/ext/prometheus-cpp-lite-1.0/core/include
     ${PROJ_DIR}/ext/prometheus-cpp-lite-1.0/simpleapi/include
+    ${PROJ_DIR}/ext/prometheus-cpp-lite-1.0/core/include
     ${PROJ_DIR}/node
     ${PROJ_DIR}/osdep
     ${PROJ_DIR}/service
