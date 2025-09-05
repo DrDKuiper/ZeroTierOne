@@ -1,0 +1,154 @@
+on:
+  pull_request:
+    paths:
+      - '**/*.sh'
+      - 'linux/**'
+      - 'gui/**'
+      - '.github/workflows/build_linux.yml'
+      - 'CMakeLists.txt'
+  push:
+    paths:
+      - '**/*.sh'
+      - 'linux/**'
+      - 'gui/**'
+      - '.github/workflows/build_linux.yml'
+      - 'CMakeLists.txt'
+  workflow_dispatch:
+
+name: Build ZeroTier One Linux
+
+jobs:
+  build_ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+    - name: gitconfig
+      run: |
+        git config --global core.autocrlf input
+    - name: checkout
+      uses: actions/checkout@v4
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libssl-dev
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        targets: x86_64-unknown-linux-gnu
+        components: rustfmt, clippy
+
+    - name: Set up cargo cache
+      uses: Swatinem/rust-cache@v2
+      continue-on-error: false
+      with:
+        key: ${{ runner.os }}-cargo-${{ hashFiles('rustybits//Cargo.lock') }}
+        shared-key: ${{ runner.os }}-cargo-
+        workspaces: |
+          rustybits/
+
+    - name: make
+      run: make
+    - name: selftest
+      run: |
+        make selftest
+        ./zerotier-selftest
+    - name: 'Tar files' # keeps permissions (execute)
+      run: tar -cvf zerotier-one.tar zerotier-one
+    - name: Archive production artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: zerotier-one-ubuntu-x64
+        path: zerotier-one.tar
+        retention-days: 7
+
+  build_gui_ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+    - name: gitconfig
+      run: |
+        git config --global core.autocrlf input
+    - name: checkout
+      uses: actions/checkout@v4
+    
+    - name: Install Qt6 and dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y qt6-base-dev qt6-tools-dev cmake build-essential libssl-dev
+    
+    - name: Install AppImage tools
+      run: |
+        # Download linuxdeploy for AppImage creation
+        wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+        chmod +x linuxdeploy-x86_64.AppImage
+        sudo mv linuxdeploy-x86_64.AppImage /usr/local/bin/linuxdeploy
+        echo "linuxdeploy installed for AppImage creation"
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        targets: x86_64-unknown-linux-gnu
+        components: rustfmt, clippy
+
+    - name: Set up cargo cache
+      uses: Swatinem/rust-cache@v2
+      continue-on-error: false
+      with:
+        key: ${{ runner.os }}-cargo-${{ hashFiles('rustybits//Cargo.lock') }}
+        shared-key: ${{ runner.os }}-cargo-
+        workspaces: |
+          rustybits/
+
+    - name: Build core ZeroTier
+      run: make
+
+    - name: Setup GUI build environment
+      run: |
+        chmod +x setup-gui-build.sh
+        ./setup-gui-build.sh
+
+    - name: Build GUI
+      run: |
+        chmod +x build-gui-linux.sh
+        ./build-gui-linux.sh
+
+    - name: Package GUI
+      run: |
+        mkdir -p zerotier-gui-package
+        
+        # Check for AppImage first (preferred standalone format)
+        if [ -f "build/deploy/ZeroTierOneGUI.AppImage" ]; then
+          echo "Packaging standalone AppImage..."
+          cp build/deploy/ZeroTierOneGUI.AppImage zerotier-gui-package/
+          echo "Standalone AppImage created: ZeroTierOneGUI.AppImage" > zerotier-gui-package/README.txt
+          echo "This file contains all dependencies and runs on any Linux system." >> zerotier-gui-package/README.txt
+          echo "Usage: chmod +x ZeroTierOneGUI.AppImage && ./ZeroTierOneGUI.AppImage" >> zerotier-gui-package/README.txt
+        elif [ -f "build/deploy/ZeroTierOneGUI" ]; then
+          echo "Packaging standalone executable..."
+          cp build/deploy/ZeroTierOneGUI zerotier-gui-package/
+          cp gui/resources/linux/zerotier-one.desktop zerotier-gui-package/
+          cp artwork/ZeroTierIcon.png zerotier-gui-package/zerotier.png
+          echo "Standalone executable created: ZeroTierOneGUI" > zerotier-gui-package/README.txt
+          echo "May require Qt6 to be installed on target systems." >> zerotier-gui-package/README.txt
+        elif [ -f "build/gui/zerotier-gui" ]; then
+          echo "Packaging basic executable..."
+          cp build/gui/zerotier-gui zerotier-gui-package/ZeroTierOneGUI
+          cp gui/resources/linux/zerotier-one.desktop zerotier-gui-package/
+          cp artwork/ZeroTierIcon.png zerotier-gui-package/zerotier.png
+          echo "Basic executable created: ZeroTierOneGUI" > zerotier-gui-package/README.txt
+          echo "Requires Qt6 to be installed on target systems." >> zerotier-gui-package/README.txt
+        else
+          echo "Error: No GUI executable found!"
+          exit 1
+        fi
+        
+        tar -cvf zerotier-gui-ubuntu.tar zerotier-gui-package/
+
+    - name: Archive GUI artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: zerotier-gui-ubuntu-x64
+        path: zerotier-gui-ubuntu.tar
+        retention-days: 7
