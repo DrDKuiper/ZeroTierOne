@@ -1,3 +1,4 @@
+#include "BaseGUIManager.hpp"
 #include "GUIManager.hpp"
 #include "../../service/OneService.hpp"
 #include "../../node/Utils.hpp"
@@ -6,36 +7,21 @@
 
 namespace ZeroTier {
 
-/**
- * Implementação base comum para todas as GUIs
- */
-class BaseGUIManager : public GUIManager {
-protected:
-    OneService* _service = nullptr;
-    std::thread _updateThread;
-    bool _running = false;
-    
-    NetworkCallback _networkCallback;
-    StatusCallback _statusCallback;
-    ErrorCallback _errorCallback;
-
-public:
-    BaseGUIManager() = default;
-    virtual ~BaseGUIManager() {
-        if (_running) {
-            shutdown();
-        }
+BaseGUIManager::~BaseGUIManager() {
+    if (_running) {
+        shutdown();
     }
+}
 
-    // Conectar ao serviço ZeroTier
-    bool connectToService() {
-        // Aqui conectaríamos ao serviço via API local
-        // Por enquanto, simular a conexão
-        return true;
-    }
+// Conectar ao serviço ZeroTier
+bool BaseGUIManager::connectToService() {
+    // Aqui conectaríamos ao serviço via API local
+    // Por enquanto, simular a conexão
+    return true;
+}
 
-    // Implementações comuns
-    std::vector<NetworkInfo> getNetworks() const override {
+// Implementações comuns
+std::vector<NetworkInfo> BaseGUIManager::getNetworks() const {
         std::vector<NetworkInfo> networks;
         
         // Simulação de dados - em implementação real,
@@ -65,7 +51,7 @@ public:
         return networks;
     }
 
-    std::vector<PeerInfo> getPeers() const override {
+std::vector<PeerInfo> BaseGUIManager::getPeers() const {
         std::vector<PeerInfo> peers;
         
         // Simulação de dados
@@ -88,7 +74,7 @@ public:
         return peers;
     }
 
-    bool joinNetwork(const std::string& networkId) override {
+bool BaseGUIManager::joinNetwork(const std::string& networkId) {
         // Implementar join via API
         if (_networkCallback) {
             NetworkInfo info;
@@ -101,7 +87,7 @@ public:
         return true;
     }
 
-    bool leaveNetwork(const std::string& networkId) override {
+bool BaseGUIManager::leaveNetwork(const std::string& networkId) {
         // Implementar leave via API
         if (_networkCallback) {
             NetworkInfo info;
@@ -113,47 +99,45 @@ public:
         return true;
     }
 
-    std::string getNodeStatus() const override {
+std::string BaseGUIManager::getNodeStatus() const {
         return "ONLINE";
     }
 
-    // Registrar callbacks
-    void setNetworkCallback(NetworkCallback callback) override {
+// Registrar callbacks
+void BaseGUIManager::setNetworkCallback(NetworkCallback callback) {
         _networkCallback = callback;
     }
 
-    void setStatusCallback(StatusCallback callback) override {
+void BaseGUIManager::setStatusCallback(StatusCallback callback) {
         _statusCallback = callback;
     }
 
-    void setErrorCallback(ErrorCallback callback) override {
+void BaseGUIManager::setErrorCallback(ErrorCallback callback) {
         _errorCallback = callback;
     }
 
-protected:
-    // Thread para atualizações periódicas
-    void startUpdateThread() {
-        _running = true;
-        _updateThread = std::thread([this]() {
-            while (_running) {
-                updateStatus();
-                std::this_thread::sleep_for(std::chrono::seconds(5));
-            }
-        });
-    }
+// Thread para atualizações periódicas
+void BaseGUIManager::startUpdateThread() {
+    _running = true;
+    _updateThread = std::thread([this]() {
+        updateLoop();
+    });
+}
 
-    void stopUpdateThread() {
-        _running = false;
-        if (_updateThread.joinable()) {
-            _updateThread.join();
-        }
+void BaseGUIManager::stopUpdateThread() {
+    _running = false;
+    if (_updateThread.joinable()) {
+        _updateThread.join();
     }
+}
 
-    virtual void updateStatus() {
+void BaseGUIManager::updateLoop() {
+    while (_running) {
         if (_statusCallback) {
             _statusCallback(getNodeStatus());
         }
+        std::this_thread::sleep_for(std::chrono::seconds(5));
     }
-};
+}
 
 } // namespace ZeroTier

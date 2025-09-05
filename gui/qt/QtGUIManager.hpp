@@ -2,6 +2,7 @@
 #define ZEROTIER_QT_GUI_MANAGER_HPP
 
 #include "../common/GUIManager.hpp"
+#include "../common/BaseGUIManager.hpp"
 #include <QObject>
 #include <QApplication>
 #include <QMainWindow>

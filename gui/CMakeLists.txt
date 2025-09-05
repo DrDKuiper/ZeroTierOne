@@ -18,6 +18,7 @@ set(GUI_SOURCES
 
 set(GUI_HEADERS
     qt/QtGUIManager.hpp
+    common/BaseGUIManager.hpp
     common/GUIManager.hpp
 )
 
