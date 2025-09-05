@@ -46,6 +46,9 @@ public:
         uint64_t maxBandwidth;  // Maximum bandwidth in bytes/sec
         double maxLatency;      // Maximum acceptable latency in ms
         bool enabled;
+
+        QoSClass() : priority(0), minBandwidth(0), maxBandwidth(0), maxLatency(0.0), enabled(false) {}
+        QoSClass(int p) : priority(p), minBandwidth(0), maxBandwidth(0), maxLatency(0.0), enabled(true) {}
     };
 
     struct NetworkPolicy {

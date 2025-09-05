@@ -105,6 +105,21 @@ public:
      */
     double getClientReputation(const std::string& client_ip);
 
+    /**
+     * Get total number of security events
+     */
+    size_t getSecurityEventCount() const;
+
+    /**
+     * Get number of active tokens
+     */
+    size_t getActiveTokenCount() const;
+
+    /**
+     * Get number of rate-limited IPs
+     */
+    size_t getRateLimitedIPsCount() const;
+
 private:
     std::string extractTokenFromHeader(const std::string& auth_header);
     bool validateJWTToken(const std::string& token, TokenInfo& token_info);
@@ -114,6 +129,7 @@ private:
     std::string generateSecureRandomString(size_t length);
     void writeSecurityLog(const nlohmann::json& log_entry);
     void sendSecurityAlert(const nlohmann::json& alert_data);
+    size_t _security_event_count;
 };
 
 } // namespace ZeroTier

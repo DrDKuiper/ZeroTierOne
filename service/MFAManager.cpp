@@ -217,6 +217,12 @@ bool MFAManager::isMFAEnabled(const std::string& clientId) const
     return _clientConfigs.find(clientId) != _clientConfigs.end();
 }
 
+size_t MFAManager::getMFAEnabledClientsCount() const
+{
+    Mutex::Lock _l(_lock);
+    return _clientConfigs.size();
+}
+
 std::string MFAManager::generateSecret() const
 {
     // Generate 160-bit (20 byte) secret for TOTP

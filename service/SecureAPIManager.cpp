@@ -187,6 +187,35 @@ bool SecureAPIManager::allowRequest(const std::string& client_ip,
     return true;
 }
 
+double SecureAPIManager::getClientReputation(const std::string& client_ip) {
+    std::lock_guard<std::mutex> lock(_metrics_mutex);
+    auto it = _client_metrics.find(client_ip);
+    if (it != _client_metrics.end()) {
+        return it->second.reputation_score;
+    }
+    return 1.0; // Default good reputation
+}
+
+size_t SecureAPIManager::getSecurityEventCount() const {
+    return _security_event_count;
+}
+
+size_t SecureAPIManager::getActiveTokenCount() const {
+    std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(_tokens_mutex));
+    return _active_tokens.size();
+}
+
+size_t SecureAPIManager::getRateLimitedIPsCount() const {
+    std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(_metrics_mutex));
+    size_t count = 0;
+    for (const auto& pair : _client_metrics) {
+        if (pair.second.reputation_score < 0.5) { // Example threshold for being "rate-limited"
+            count++;
+        }
+    }
+    return count;
+}
+
 void SecureAPIManager::logSecurityEvent(const std::string& event_type,
                                       const std::string& details,
                                       SecurityLevel level,
@@ -202,6 +231,8 @@ void SecureAPIManager::logSecurityEvent(const std::string& event_type,
         {"process_id", OSUtils::getProcessId()}
     };
     
+    _security_event_count++;
+
     // Write to security log
     writeSecurityLog(log_entry);
     

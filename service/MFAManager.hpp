@@ -85,6 +85,11 @@ public:
      */
     bool isMFAEnabled(const std::string& clientId) const;
 
+    /**
+     * Get number of clients with MFA enabled
+     */
+    size_t getMFAEnabledClientsCount() const;
+
 private:
     mutable Mutex _lock;
     std::unordered_map<std::string, TOTPConfig> _clientConfigs;
