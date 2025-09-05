@@ -35,6 +35,7 @@ if(UNIX)
         ${PROJ_DIR}/osdep/Http.cpp
         ${PROJ_DIR}/osdep/Phy.cpp
         ${PROJ_DIR}/osdep/Arp.cpp
+        ${PROJ_DIR}/osdep/EthernetTap.cpp
     )
     list(APPEND osdep_src ${osdep_unix_src})
 
