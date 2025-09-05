@@ -416,5 +416,3 @@ void QtGUIManager::makeApiCall(const QString& endpoint, std::function<void(QJson
 }
 
 } // namespace ZeroTier
-
-#include "QtGUIManager.moc"

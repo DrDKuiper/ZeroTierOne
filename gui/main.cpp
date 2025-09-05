@@ -1,5 +1,5 @@
-#include "gui/qt/QtGUIManager.hpp"
-#include "gui/common/GUIManager.hpp"
+#include "qt/QtGUIManager.hpp"
+#include "common/GUIManager.hpp"
 #include <QApplication>
 #include <QSystemTrayIcon>
 #include <QMessageBox>

@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 # Enable Qt6 support
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network)
 
 # Set up Qt6 for this project
 set(CMAKE_AUTOMOC ON)
@@ -33,7 +33,8 @@ add_executable(zerotier-gui ${GUI_SOURCES} ${GUI_HEADERS} ${GUI_RESOURCES})
 target_link_libraries(zerotier-gui 
     Qt6::Core 
     Qt6::Widgets
-    ${ZEROTIER_ONE_LIBRARIES}
+    Qt6::Network
+    zerotiercore
 )
 
 # Include directories
@@ -67,11 +68,26 @@ elseif(APPLE)
         MACOSX_BUNDLE_ICON_FILE "zerotier.icns"
     )
     
-    # Add macOS resources
-    target_sources(zerotier-gui PRIVATE resources/macos/zerotier.icns)
-    set_source_files_properties(resources/macos/zerotier.icns PROPERTIES
-        MACOSX_PACKAGE_LOCATION "Resources"
-    )
+    # Add macOS resources if the icon file exists
+    set(MACOS_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/resources/macos/zerotier.icns")
+    if(EXISTS "${MACOS_ICON_PATH}")
+        target_sources(zerotier-gui PRIVATE "${MACOS_ICON_PATH}")
+        set_source_files_properties("${MACOS_ICON_PATH}" PROPERTIES
+            MACOSX_PACKAGE_LOCATION "Resources"
+        )
+    else()
+        # Copy from artwork directory if it exists
+        set(ARTWORK_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../artwork/ZeroTierIcon.icns")
+        if(EXISTS "${ARTWORK_ICON_PATH}")
+            file(COPY "${ARTWORK_ICON_PATH}" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/resources/macos/")
+            file(RENAME "${CMAKE_CURRENT_SOURCE_DIR}/resources/macos/ZeroTierIcon.icns" 
+                        "${CMAKE_CURRENT_SOURCE_DIR}/resources/macos/zerotier.icns")
+            target_sources(zerotier-gui PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/resources/macos/zerotier.icns")
+            set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/resources/macos/zerotier.icns" PROPERTIES
+                MACOSX_PACKAGE_LOCATION "Resources"
+            )
+        endif()
+    endif()
     
 elseif(UNIX)
     # Linux-specific settings

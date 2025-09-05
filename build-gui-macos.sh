@@ -3,6 +3,13 @@
 
 echo "Building ZeroTier One GUI for macOS..."
 
+# Ensure macOS icon exists
+mkdir -p gui/resources/macos
+if [ ! -f "gui/resources/macos/zerotier.icns" ] && [ -f "artwork/ZeroTierIcon.icns" ]; then
+    echo "Copying icon file for macOS..."
+    cp artwork/ZeroTierIcon.icns gui/resources/macos/zerotier.icns
+fi
+
 # Check if Qt6 is installed
 if ! command -v qmake &> /dev/null; then
     echo "Qt6 not found. Please install Qt6 (brew install qt6)"

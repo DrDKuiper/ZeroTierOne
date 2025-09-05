@@ -168,6 +168,11 @@ jobs:
     - name: Build core ZeroTier
       run: make
 
+    - name: Setup GUI build environment
+      run: |
+        chmod +x setup-gui-build.sh
+        ./setup-gui-build.sh
+
     - name: Build GUI
       run: |
         chmod +x build-gui-linux.sh
@@ -260,6 +265,11 @@ jobs:
     - name: Build core ZeroTier
       run: make
 
+    - name: Setup GUI build environment  
+      run: |
+        chmod +x setup-gui-build.sh
+        ./setup-gui-build.sh
+
     - name: Build GUI
       run: |
         chmod +x build-gui-macos.sh
@@ -322,6 +332,11 @@ jobs:
     - name: Build core ZeroTier
       run: |
         msbuild windows\ZeroTierOne.sln /m /p:Configuration=Release  /property:Platform=x64 /t:ZeroTierOne
+
+    - name: Setup GUI build environment
+      run: |
+        .\setup-gui-build.sh
+      shell: bash
 
     - name: Build GUI
       run: |
