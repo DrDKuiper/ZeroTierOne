@@ -28,22 +28,49 @@ REM Create build directory
 if not exist "build" mkdir build
 cd build
 
-REM Configure with CMake
-cmake .. -G "Visual Studio 17 2022" -DCMAKE_PREFIX_PATH="%Qt6_DIR%" -DBUILD_GUI=ON
+REM Display Qt and CMake paths for debugging
+echo Qt6_DIR is set to: %Qt6_DIR%
+echo PATH is set to: %PATH%
+echo QT_PLUGIN_PATH is set to: %QT_PLUGIN_PATH%
+echo CMake version: 
+cmake --version
+
+REM Create CMake debug log file
+set "CMAKE_DEBUG_LOG=cmake_debug.log"
+
+REM Configure with CMake with verbose output
+echo Configuring with CMake...
+cmake .. -G "Visual Studio 17 2022" -DCMAKE_PREFIX_PATH="%Qt6_DIR%" -DBUILD_GUI=ON -DCMAKE_VERBOSE_MAKEFILE=ON > %CMAKE_DEBUG_LOG% 2>&1
 
 if %ERRORLEVEL% NEQ 0 (
-    echo CMake configuration failed!
+    echo CMake configuration failed! See %CMAKE_DEBUG_LOG% for details
+    type %CMAKE_DEBUG_LOG%
     cd ..
     exit /b 1
 )
 
-REM Build the project
-cmake --build . --config Release
+REM Echo the generated CMake files
+echo CMake files generated:
+dir /b /s CMakeFiles > cmake_files.txt
+type cmake_files.txt
+
+REM Build the project with verbose output
+echo Building the project...
+cmake --build . --config Release --verbose > build_log.txt 2>&1
 
 if %ERRORLEVEL% NEQ 0 (
-    echo Build failed!
+    echo Build failed! See build_log.txt for details
+    type build_log.txt
     cd ..
     exit /b 1
+)
+
+REM Check if GUI directory exists
+echo Checking build output directories...
+if not exist "gui" (
+    echo GUI directory does not exist! Creating it...
+    mkdir gui
+    mkdir gui\Release
 )
 
 REM Create standalone executable using windeployqt
