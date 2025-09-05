@@ -51,7 +51,31 @@ echo Creating standalone executable...
 if not exist "deploy" mkdir deploy
 
 REM Copy the main executable
-copy "gui\Release\ZeroTier One.exe" "deploy\ZeroTierOneGUI.exe"
+if exist "gui\Release\ZeroTier One.exe" (
+    echo Copying GUI executable...
+    copy "gui\Release\ZeroTier One.exe" "deploy\ZeroTierOneGUI.exe"
+    if %ERRORLEVEL% NEQ 0 (
+        echo Failed to copy GUI executable!
+        exit /b 1
+    )
+) else (
+    echo GUI executable not found at gui\Release\ZeroTier One.exe
+    echo Checking alternate locations...
+    
+    if exist "gui\ZeroTier One.exe" (
+        echo Found at gui\ZeroTier One.exe
+        copy "gui\ZeroTier One.exe" "deploy\ZeroTierOneGUI.exe"
+    ) else if exist "gui\Release\zerotier-gui.exe" (
+        echo Found at gui\Release\zerotier-gui.exe
+        copy "gui\Release\zerotier-gui.exe" "deploy\ZeroTierOneGUI.exe"
+    ) else if exist "gui\zerotier-gui.exe" (
+        echo Found at gui\zerotier-gui.exe
+        copy "gui\zerotier-gui.exe" "deploy\ZeroTierOneGUI.exe"
+    ) else (
+        echo No GUI executable found! Build may have failed.
+        exit /b 1
+    )
+)
 
 REM Deploy Qt dependencies to create standalone package
 cd deploy

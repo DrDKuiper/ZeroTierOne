@@ -358,16 +358,46 @@ jobs:
 
     - name: Package GUI
       run: |
-        if (Test-Path "build\deploy\ZeroTierOneGUI.exe") {
-          Write-Host "Packaging standalone executable with dependencies..."
-          Compress-Archive -Path "build\deploy\*" -DestinationPath "zerotier-gui-windows.zip"
-          Write-Host "Standalone package created: zerotier-gui-windows.zip"
-        } elseif (Test-Path "build\gui\Release\ZeroTier One.exe") {
-          Write-Host "Packaging basic executable..."
-          Compress-Archive -Path "build\gui\Release\*" -DestinationPath "zerotier-gui-windows.zip"
-          Write-Host "Basic package created: zerotier-gui-windows.zip"
-        } else {
-          Write-Host "Error: No GUI executable found!"
+        Write-Host "Searching for GUI executable in multiple possible locations..."
+        
+        # Define possible locations for the GUI executable
+        $possibleLocations = @(
+          "build\deploy\ZeroTierOneGUI.exe",
+          "build\gui\Release\ZeroTier One.exe",
+          "build\gui\ZeroTier One.exe",
+          "build\gui\Release\zerotier-gui.exe",
+          "build\gui\zerotier-gui.exe"
+        )
+        
+        # Loop through possible locations
+        $found = $false
+        foreach ($location in $possibleLocations) {
+          if (Test-Path $location) {
+            Write-Host "Found GUI executable at: $location"
+            $found = $true
+            
+            # Create output directory if it doesn't exist
+            if (-not (Test-Path "package")) {
+              New-Item -Path "package" -ItemType Directory
+            }
+            
+            # Determine the source directory based on the found executable
+            $sourceDir = Split-Path -Parent $location
+            Write-Host "Source directory: $sourceDir"
+            
+            # Package the executable and dependencies
+            Write-Host "Packaging executable with dependencies..."
+            Copy-Item -Path "$sourceDir\*" -Destination "package" -Recurse
+            Compress-Archive -Path "package\*" -DestinationPath "zerotier-gui-windows.zip" -Force
+            Write-Host "Package created: zerotier-gui-windows.zip"
+            break
+          }
+        }
+        
+        if (-not $found) {
+          Write-Host "Error: No GUI executable found in any expected location!"
+          Write-Host "Listing build directory contents for debugging:"
+          Get-ChildItem -Recurse -Path "build" -ErrorAction SilentlyContinue | Select-Object FullName
           exit 1
         }
       if: success() # Only package if GUI build succeeded
