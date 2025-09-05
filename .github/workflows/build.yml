@@ -15,6 +15,12 @@ jobs:
       #        git config --global core.eol lf
     - name: checkout
       uses: actions/checkout@v4
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libssl-dev
+    
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
@@ -139,7 +145,7 @@ jobs:
     - name: Install Qt6 and dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y qt6-base-dev qt6-tools-dev cmake build-essential
+        sudo apt-get install -y qt6-base-dev qt6-tools-dev cmake build-essential libssl-dev
     
     - name: Install AppImage tools
       run: |
@@ -335,7 +341,7 @@ jobs:
 
     - name: Setup GUI build environment
       run: |
-        .\setup-gui-build.sh
+        ./setup-gui-build.sh
       shell: bash
 
     - name: Build GUI
