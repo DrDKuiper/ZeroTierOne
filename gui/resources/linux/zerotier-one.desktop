@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=ZeroTier One
+Comment=ZeroTier One Network Virtualization Service
+GenericName=Network Manager
+Exec=zerotier-gui
+Icon=zerotier
+Terminal=false
+Type=Application
+Categories=Network;System;
+StartupNotify=true
+Keywords=network;vpn;p2p;zerotier;
+StartupWMClass=zerotier-gui

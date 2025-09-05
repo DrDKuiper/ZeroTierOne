@@ -1,0 +1,2 @@
+# This file should be a symlink or copy of the main ZeroTier icon
+# ln -s ../../artwork/ZeroTierIcon.png zerotier.png

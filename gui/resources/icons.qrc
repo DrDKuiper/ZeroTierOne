@@ -1,0 +1,22 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file>zerotier_16.png</file>
+        <file>zerotier_32.png</file>
+        <file>zerotier_48.png</file>
+        <file>zerotier_64.png</file>
+        <file>zerotier_128.png</file>
+        <file>zerotier_256.png</file>
+        
+        <!-- Status icons -->
+        <file>status_online.png</file>
+        <file>status_offline.png</file>
+        <file>status_connecting.png</file>
+        
+        <!-- Action icons -->
+        <file>join.png</file>
+        <file>leave.png</file>
+        <file>refresh.png</file>
+        <file>settings.png</file>
+        <file>quit.png</file>
+    </qresource>
+</RCC>

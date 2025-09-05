@@ -1,163 +1,376 @@
-ZeroTier - Global Area Networking
-======
+# ZeroTier One - Global Area Networking with GUI
 
-*This document is written for a software developer audience. For information on using ZeroTier, see the: [Website](https://www.zerotier.com), [Documentation Site](https://docs.zerotier.com), and [Discussion Forum](https://discuss.zerotier.com).*
+*This comprehensive document covers both the core ZeroTier One functionality and the new graphical user interface (GUI) implementation.*
 
-ZeroTier is a smart programmable Ethernet switch for planet Earth. It allows all networked devices, VMs, containers, and applications to communicate as if they all reside in the same physical data center or cloud region.
+## Overview
+
+**ZeroTier** is a smart programmable Ethernet switch for planet Earth. It allows all networked devices, VMs, containers, and applications to communicate as if they all reside in the same physical data center or cloud region.
 
 This is accomplished by combining a cryptographically addressed and secure peer to peer network (termed VL1) with an Ethernet emulation layer somewhat similar to VXLAN (termed VL2). Our VL2 Ethernet virtualization layer includes advanced enterprise SDN features like fine grained access control rules for network micro-segmentation and security monitoring.
 
 All ZeroTier traffic is encrypted end-to-end using secret keys that only you control. Most traffic flows peer to peer, though we offer free (but slow) relaying for users who cannot establish peer to peer connections.
 
-The goals and design principles of ZeroTier are inspired by among other things the original [Google BeyondCorp](https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/43231.pdf) paper and the [Jericho Forum](https://en.wikipedia.org/wiki/Jericho_Forum) with its notion of "deperimeterization."
+**NEW: GUI Interface** - This repository now includes a complete graphical user interface that transforms the ZeroTier One command-line application into a user-friendly desktop application with system tray support for Windows, macOS, and Linux.
 
-Visit [ZeroTier's site](https://www.zerotier.com/) for more information and [pre-built binary packages](https://www.zerotier.com/download/). Apps for Android and iOS are available for free in the Google Play and Apple app stores.
+## Table of Contents
 
-ZeroTier is licensed under the [BSL version 1.1](https://mariadb.com/bsl11/). See [LICENSE.txt](LICENSE.txt) and the [ZeroTier pricing page](https://www.zerotier.com/pricing) for details. ZeroTier is free to use internally in businesses and academic institutions and for non-commercial purposes. Certain types of commercial use such as building closed-source apps and devices based on ZeroTier or offering ZeroTier network controllers and network management as a SaaS service require a commercial license.
+1. [Getting Started](#getting-started)
+2. [GUI Quick Start](#gui-quick-start) 
+3. [GUI Features](#gui-features)
+4. [Building from Source](#building-from-source)
+5. [GUI Building Instructions](#gui-building-instructions)
+6. [Installation](#installation)
+7. [Usage](#usage)
+8. [Troubleshooting](#troubleshooting)
+9. [Project Layout](#project-layout)
+10. [API & Metrics](#api--metrics)
 
-A small amount of third party code is also included in ZeroTier and is not subject to our BSL license. See [AUTHORS.md](AUTHORS.md) for a list of third party code, where it is included, and the licenses that apply to it. All of the third party code in ZeroTier is liberally licensed (MIT, BSD, Apache, public domain, etc.).
+---
 
-### Getting Started
+## Getting Started
 
 Everything in the ZeroTier world is controlled by two types of identifier: 40-bit/10-digit *ZeroTier addresses* and 64-bit/16-digit *network IDs*. These identifiers are easily distinguished by their length. A ZeroTier address identifies a node or "device" (laptop, phone, server, VM, app, etc.) while a network ID identifies a virtual Ethernet network that can be joined by devices.
 
 ZeroTier addresses can be thought of as port numbers on an enormous planet-wide enterprise Ethernet smart switch supporting VLANs. Network IDs are VLAN IDs to which these ports may be assigned. A single port can be assigned to more than one VLAN.
 
-A ZeroTier address looks like `8056c2e21c` and a network ID looks like `8056c2e21c000001`. Network IDs are composed of the ZeroTier address of that network's primary controller and an arbitrary 24-bit ID that identifies the network on this controller. Network controllers are roughly analogous to SDN controllers in SDN protocols like [OpenFlow](https://en.wikipedia.org/wiki/OpenFlow), though as with the analogy between VXLAN and VL2 this should not be read to imply that the protocols or design are the same. You can use our convenient and inexpensive SaaS hosted controllers at [my.zerotier.com](https://my.zerotier.com/) or [run your own controller](controller/) if you don't mind messing around with JSON configuration files or writing scripts to do so.
+A ZeroTier address looks like `8056c2e21c` and a network ID looks like `8056c2e21c000001`. 
 
-### Project Layout
+Visit [ZeroTier's site](https://www.zerotier.com/) for more information and [pre-built binary packages](https://www.zerotier.com/download/). Apps for Android and iOS are available for free in the Google Play and Apple app stores.
 
-The base path contains the ZeroTier One service main entry point (`one.cpp`), self test code, makefiles, etc.
+---
 
- - `artwork/`: icons, logos, etc.
- - `attic/`: old stuff and experimental code that we want to keep around for reference.
- - `controller/`: the reference network controller implementation, which is built and included by default on desktop and server build targets.
- - `debian/`: files for building Debian packages on Linux.
- - `doc/`: manual pages and other documentation.
- - `ext/`: third party libraries, binaries that we ship for convenience on some platforms (Mac and Windows), and installation support files.
- - `include/`: include files for the ZeroTier core.
- - `java/`: a JNI wrapper used with our Android mobile app. (The whole Android app is not open source but may be made so in the future.)
- - `node/`: the ZeroTier virtual Ethernet switch core, which is designed to be entirely separate from the rest of the code and able to be built as a stand-alone OS-independent library. Note to developers: do not use C++11 features in here, since we want this to build on old embedded platforms that lack C++11 support. C++11 can be used elsewhere.
- - `osdep/`: code to support and integrate with OSes, including platform-specific stuff only built for certain targets.
- - `rule-compiler/`: JavaScript rules language compiler for defining network-level rules.
- - `service/`: the ZeroTier One service, which wraps the ZeroTier core and provides VPN-like connectivity to virtual networks for desktops, laptops, servers, VMs, and containers.
- - `windows/`: Visual Studio solution files, Windows service code, and the Windows task bar app UI.
- - `zeroidc/`: OIDC implementation used by ZeroTier service to log into SSO-enabled networks. (This part is written in Rust, and more Rust will be appearing in this repository in the future.)
+## GUI Quick Start
 
-### Contributing
+### What is the GUI?
 
-Please do pull requests off of the `dev` branch.
+The ZeroTier One GUI transforms the command-line application into a user-friendly graphical interface with system tray support for Windows, macOS, and Linux.
 
-Releases are done by merging `dev` into `main` and then tagging and doing builds. 
+### Quick Build & Run
 
-### Build and Platform Notes
+**Windows:**
+```batch
+# Run this in PowerShell or Command Prompt
+build-gui-windows.bat
+```
+
+**macOS:**
+```bash
+# Run this in Terminal
+chmod +x build-gui-macos.sh
+./build-gui-macos.sh
+```
+
+**Linux:**
+```bash
+# Run this in Terminal
+chmod +x build-gui-linux.sh
+./build-gui-linux.sh
+```
+
+**Any Platform:**
+```bash
+# Universal script that detects your platform
+chmod +x build-gui.sh
+./build-gui.sh
+```
+
+### What You Get
+
+✅ **System Tray Icon** - Always accessible from your taskbar/menu bar  
+✅ **Network Management** - Join/leave ZeroTier networks with a click  
+✅ **Real-time Status** - See your networks, peers, and connection status  
+✅ **Cross-Platform** - Works on Windows, macOS, and Linux  
+✅ **Auto-Detection** - Automatically finds your ZeroTier service  
+
+---
+
+## GUI Features
+
+### Main Window
+- **Node Status**: Displays your ZeroTier node ID, status, and version
+- **Networks Table**: Shows all joined networks with status, member count, and traffic
+- **Network Controls**: Join new networks or leave existing ones
+- **Peers Table**: Displays connected peers with latency and version information
+
+### System Tray
+- **Tray Icon**: Shows connection status (green=online, red=offline, yellow=connecting)
+- **Context Menu**: Quick access to show/hide window and quit application
+- **Notifications**: Shows important status changes and network events
+
+### Advanced Features
+- 🔄 **Auto-refresh** every 5 seconds
+- 📊 **Network statistics** (traffic, members)
+- 👥 **Peer information** (latency, status)
+- 🔔 **Desktop notifications** for network events
+- 🎨 **Status-aware tray icon** (green=online, red=offline)
+- 🖥️ **Hide to tray** when closing window
+
+---
+
+## Building from Source
+
+### Prerequisites for Core ZeroTier
 
 To build on Mac and Linux just type `make`. On FreeBSD and OpenBSD `gmake` (GNU make) is required and can be installed from packages or ports. For Windows there is a Visual Studio solution in `windows/`.
 
- - **Mac**
-   - Xcode command line tools for macOS 10.13 or newer are required.
-   - Rust for x86_64 and ARM64 targets *if SSO is enabled in the build*.
- - **Linux**
-   - The minimum compiler versions required are GCC/G++ 8.x or CLANG/CLANG++ 5.x.
-   - Linux makefiles automatically detect and prefer clang/clang++ if present as it produces smaller and slightly faster binaries in most cases. You can override by supplying CC and CXX variables on the make command line.
-   - Rust for x86_64 and ARM64 targets *if SSO is enabled in the build*.
- - **Windows**
-   - Visual Studio 2022 on Windows 10 or newer.
-   - Rust for x86_64 and ARM64 targets *if SSO is enabled in the build*.
- - **FreeBSD**
-   - GNU make is required. Type `gmake` to build.
-   - `binutils` is required.  Type `pkg install binutils` to install.
-   - Rust for x86_64 and ARM64 targets *if SSO is enabled in the build*.
- - **OpenBSD**
-   - There is a limit of four network memberships on OpenBSD as there are only four tap devices (`/dev/tap0` through `/dev/tap3`).
-   - GNU make is required. Type `gmake` to build.
-   - Rust for x86_64 and ARM64 targets *if SSO is enabled in the build*.
+**Platform-specific requirements:**
 
-Typing `make selftest` will build a *zerotier-selftest* binary which unit tests various internals and reports on a few aspects of the build environment. It's a good idea to try this on novel platforms or architectures.
+- **Mac**: Xcode command line tools for macOS 10.13 or newer are required.
+- **Linux**: The minimum compiler versions required are GCC/G++ 8.x or CLANG/CLANG++ 5.x.
+- **Windows**: Visual Studio 2022 on Windows 10 or newer.
+- **FreeBSD**: GNU make is required. Type `gmake` to build. `binutils` is required.
+- **OpenBSD**: GNU make is required. Type `gmake` to build.
 
-### Running
+Typing `make selftest` will build a *zerotier-selftest* binary which unit tests various internals.
+
+---
+
+## GUI Building Instructions
+
+### Prerequisites for GUI
+
+All platforms require:
+- **ZeroTier One service** must be installed and running
+- **CMake** 3.16 or later
+- **Qt6** development libraries
+- **C++11** compatible compiler
+
+### Quick Install Prerequisites
+
+**Windows:**
+- Install Qt6 from qt.io
+- Install Visual Studio Build Tools
+- Install CMake
+
+**macOS:**
+```bash
+brew install qt6 cmake
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt install qt6-base-dev qt6-tools-dev cmake build-essential
+```
+
+**Fedora:**
+```bash
+sudo dnf install qt6-qtbase-devel qt6-qttools-devel cmake gcc-c++
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S qt6-base qt6-tools cmake gcc
+```
+
+### Building the GUI
+
+#### Windows
+1. Install Qt6 (download from qt.io or use vcpkg)
+2. Install Visual Studio 2019 or later with C++ support
+3. Install CMake
+4. Run the build script:
+   ```batch
+   build-gui-windows.bat
+   ```
+
+The executable will be created at `build\gui\Release\ZeroTier One.exe`
+
+#### macOS
+1. Install Xcode command line tools:
+   ```bash
+   xcode-select --install
+   ```
+2. Install dependencies via Homebrew:
+   ```bash
+   brew install qt6 cmake
+   ```
+3. Run the build script:
+   ```bash
+   chmod +x build-gui-macos.sh
+   ./build-gui-macos.sh
+   ```
+
+The application bundle will be created at `build/gui/ZeroTier One.app`
+
+#### Linux
+1. Install dependencies (see prerequisites above)
+2. Run the build script:
+   ```bash
+   chmod +x build-gui-linux.sh
+   ./build-gui-linux.sh
+   ```
+
+The executable will be created at `build/gui/zerotier-gui`
+
+---
+
+## Installation
+
+### Core ZeroTier Installation
+On most distributions, macOS, and Windows, the installer will start the service and set it up to start on boot.
+
+### GUI Installation
+
+#### Windows
+1. Build the application using the build script
+2. The executable can be run directly or installed to `Program Files`
+3. For system-wide installation, copy to `C:\Program Files\ZeroTier\One\`
+
+#### macOS
+1. Build the application using the build script
+2. Copy `ZeroTier One.app` to `/Applications/`
+3. Grant necessary permissions in System Preferences > Security & Privacy
+
+#### Linux
+1. Build the application using the build script
+2. Install system-wide:
+   ```bash
+   sudo cp build/gui/zerotier-gui /usr/local/bin/
+   sudo cp gui/resources/linux/zerotier-one.desktop /usr/share/applications/
+   sudo cp artwork/ZeroTierIcon.png /usr/share/pixmaps/zerotier.png
+   ```
+
+---
+
+## Usage
+
+### Command Line Usage
 
 Running *zerotier-one* with `-h` option will show help.
 
 On Linux and BSD, if you built from source, you can start the service with:
+```bash
+sudo ./zerotier-one -d
+```
 
-    sudo ./zerotier-one -d
+The service is controlled via the JSON API, which by default is available at `127.0.0.1:9993`. We include a *zerotier-cli* command line utility to make API calls for standard things like joining and leaving networks.
 
-On most distributions, macOS, and Windows, the installer will start the service and set it up to start on boot.
+### GUI Usage
 
-A home folder for your system will automatically be created.
+#### First Run
+1. Ensure ZeroTier One service is running
+2. Launch the GUI application
+3. The application will automatically locate the authentication token
+4. If the token cannot be found, check service status and permissions
 
-The service is controlled via the JSON API, which by default is available at `127.0.0.1:9993`. It also listens on `0.0.0.0:9993` which is only usable if `allowManagementFrom` is properly configured in `local.conf`. We include a *zerotier-cli* command line utility to make API calls for standard things like joining and leaving networks. The *authtoken.secret* file in the home folder contains the secret token for accessing this API. See [service/README.md](service/README.md) for API documentation.
+#### Network Management
+1. **Join a Network**: Enter the 16-character network ID and click "Join Network"
+2. **Leave a Network**: Select a network in the table and click "Leave Network" 
+3. **Refresh Data**: Click "Refresh" to update network and peer information
+
+#### System Tray
+- **Double-click**: Show/hide the main window
+- **Right-click**: Access context menu with options to show, hide, or quit
+
+### Home Folders
 
 Here's where home folders live (by default) on each OS:
 
- * **Linux**: `/var/lib/zerotier-one`
- * **FreeBSD** / **OpenBSD**: `/var/db/zerotier-one`
- * **Mac**: `/Library/Application Support/ZeroTier/One`
- * **Windows**: `\ProgramData\ZeroTier\One` (That's the default. The base 'shared app data' folder might be different if Windows is installed with a non-standard drive letter assignment or layout.)
+- **Linux**: `/var/lib/zerotier-one`
+- **FreeBSD** / **OpenBSD**: `/var/db/zerotier-one`
+- **Mac**: `/Library/Application Support/ZeroTier/One`
+- **Windows**: `\ProgramData\ZeroTier\One`
 
-### Basic Troubleshooting
+### Authentication Token Locations
+
+The GUI automatically connects to the local ZeroTier One service using:
+- **API Endpoint**: `http://127.0.0.1:9993`
+- **Authentication**: Reads token from standard ZeroTier locations
+
+**Token Locations:**
+- **Windows**: `%PROGRAMDATA%\ZeroTier\One\authtoken.secret`
+- **macOS**: `/Library/Application Support/ZeroTier/One/authtoken.secret`
+- **Linux**: `/var/lib/zerotier-one/authtoken.secret`
+
+---
+
+## Troubleshooting
+
+### Core ZeroTier Troubleshooting
 
 For most users, it just works.
 
-If you are running a local system firewall, we recommend adding a rules permitting zerotier. If you installed binaries for Windows this should be done automatically. Other platforms might require manual editing of local firewall rules depending on your configuration.
+If you are running a local system firewall, we recommend adding rules permitting zerotier. 
 
-See the [documentation site](https://docs.zerotier.com/zerotier/troubleshooting) for more information.
+**Common Issues:**
+- **Firewall**: Check if UDP port 9993 inbound is open for LAN discovery
+- **NAT**: Users behind "symmetric" NAT may need "full cone" NAT mode
+- **Fallback**: If UDP is blocked, ZeroTier falls back to TCP tunneling over port 443
 
-The Mac firewall can be found under "Security" in System Preferences. Linux has a variety of firewall configuration systems and tools.
+### GUI Troubleshooting
 
-On CentOS check `/etc/sysconfig/iptables` for IPTables rules. For other distributions consult your distribution's documentation. You'll also have to check the UIs or documentation for commercial third party firewall applications like Little Snitch (Mac), McAfee Firewall Enterprise (Windows), etc. if you are running any of those. Some corporate environments might have centrally managed firewall software, so you might also have to contact IT.
+#### "Failed to initialize ZeroTier One GUI"
+- Ensure ZeroTier One service is running
+- Check that the authentication token file exists and is readable
+- Verify the service is listening on port 9993
 
-ZeroTier One peers will automatically locate each other and communicate directly over a local wired LAN *if UDP port 9993 inbound is open*. If that port is filtered, they won't be able to see each others' LAN announcement packets. If you're experiencing poor performance between devices on the same physical network, check their firewall settings. Without LAN auto-location peers must attempt "loopback" NAT traversal, which sometimes fails and in any case requires that every packet traverse your external router twice.
+#### "Could not find authentication token"
+- The GUI cannot locate the ZeroTier authentication token
+- Ensure you have proper permissions to read the token file
+- Try running as administrator/root or check service status
 
-Users behind certain types of firewalls and "symmetric" NAT devices may not be able to connect to external peers directly at all. ZeroTier has limited support for port prediction and will *attempt* to traverse symmetric NATs, but this doesn't always work. If P2P connectivity fails you'll be bouncing UDP packets off our relay servers resulting in slower performance. Some NAT router(s) have a configurable NAT mode, and setting this to "full cone" will eliminate this problem. If you do this you may also see a magical improvement for things like VoIP phones, Skype, BitTorrent, WebRTC, certain games, etc., since all of these use NAT traversal techniques similar to ours.
+#### GUI appears but shows no data
+- The service might not be responding
+- Check if firewall is blocking localhost connections
+- Verify ZeroTier One service is properly started
 
-If a firewall between you and the Internet blocks ZeroTier's UDP traffic, you will fall back to last-resort TCP tunneling to rootservers over port 443 (https impersonation). This will work almost anywhere but is *very slow* compared to UDP or direct peer to peer connectivity.
+#### Icons not displaying properly
+- Ensure Qt6 is properly installed
+- Check that the resource files are bundled with the application
+- Try rebuilding with proper Qt6 paths
 
-Additional help can be found in our [knowledge base](https://zerotier.atlassian.net/wiki/spaces/SD/overview).
+For additional help, see our [knowledge base](https://zerotier.atlassian.net/wiki/spaces/SD/overview) and [documentation site](https://docs.zerotier.com/zerotier/troubleshooting).
+
+---
+
+## Project Layout
+
+The base path contains the ZeroTier One service main entry point (`one.cpp`), self test code, makefiles, etc.
+
+- `artwork/`: icons, logos, etc.
+- `attic/`: old stuff and experimental code that we want to keep around for reference.
+- `controller/`: the reference network controller implementation
+- `debian/`: files for building Debian packages on Linux.
+- `doc/`: manual pages and other documentation.
+- `ext/`: third party libraries, binaries that we ship for convenience on some platforms
+- **`gui/`**: **NEW - Graphical user interface implementation**
+  - `main.cpp`: Application entry point
+  - `CMakeLists.txt`: Build configuration  
+  - `qt/`: Qt6-specific implementation
+  - `common/`: Platform-independent interface
+  - `resources/`: Platform-specific resources (icons, etc.)
+- `include/`: include files for the ZeroTier core.
+- `java/`: a JNI wrapper used with our Android mobile app.
+- `node/`: the ZeroTier virtual Ethernet switch core
+- `osdep/`: code to support and integrate with OSes
+- `rule-compiler/`: JavaScript rules language compiler
+- `service/`: the ZeroTier One service
+- `windows/`: Visual Studio solution files, Windows service code
+- `zeroidc/`: OIDC implementation used by ZeroTier service
+
+---
+
+## API & Metrics
+
+### JSON API
+
+The service is controlled via the JSON API, which by default is available at `127.0.0.1:9993`. The *authtoken.secret* file in the home folder contains the secret token for accessing this API. See [service/README.md](service/README.md) for API documentation.
 
 ### Prometheus Metrics
 
-Prometheus Metrics are available at the `/metrics` API endpoint.  This endpoint is protected by an API key stored in `metricstoken.secret` to prevent unwanted information leakage.  Information that could be gleaned from the metrics include joined networks and peers your instance is talking to. 
+Prometheus Metrics are available at the `/metrics` API endpoint. This endpoint is protected by an API key stored in `metricstoken.secret`.
 
-Access control is via the ZeroTier control interface itself and `metricstoken.secret`. This can be sent as a bearer auth token, via the `X-ZT1-Auth` HTTP header field, or appended to the URL as `?auth=<token>`. You can see the current metrics via `cURL` with the following command:
+**Access Examples:**
+```bash
+# Linux
+curl -H "X-ZT1-Auth: $(sudo cat /var/lib/zerotier-one/metricstoken.secret)" http://localhost:9993/metrics
 
-    // Linux
-    curl -H "X-ZT1-Auth: $(sudo cat /var/lib/zerotier-one/metricstoken.secret)" http://localhost:9993/metrics
+# macOS  
+curl -H "X-ZT1-Auth: $(sudo cat /Library/Application\ Support/ZeroTier/One/metricstoken.secret)" http://localhost:9993/metrics
 
-    // macOS
-    curl -H "X-ZT1-Auth: $(sudo cat /Library/Application\ Support/ZeroTier/One/metricstoken.secret)" http://localhost:9993/metrics
-
-    // Windows PowerShell (Admin)
-    Invoke-RestMethod -Headers @{'X-ZT1-Auth' = "$(Get-Content C:\ProgramData\ZeroTier\One\metricstoken.secret)"; } -Uri http://localhost:9993/metrics
-
-To configure a scrape job in Prometheus on the machine ZeroTier is running on, add this to your Prometheus `scrape_config`:
-
-    - job_name: zerotier-one
-      honor_labels: true
-      scrape_interval: 15s
-      metrics_path: /metrics
-      static_configs:
-      - targets:
-        - 127.0.0.1:9993
-        labels:
-          group: zerotier-one
-          node_id: $YOUR_10_CHARACTER_NODE_ID
-      authorization:
-        credentials: $YOUR_METRICS_TOKEN_SECRET
-
-If neither of these methods are desirable, it is probably possible to distribute metrics via [Prometheus Proxy](https://github.com/pambrose/prometheus-proxy) or some other tool.  Note: We have not tested this internally, but will probably work with the correct configuration.
-
-Metrics are also available on disk in ZeroTier's working directory:
-
-   // Linux
-   /var/lib/zerotier-one/metrics.prom
-
-   // macOS
-   /Library/Application\ Support/ZeroTier/One/metrics.prom
-
-   //Windows
-   C:\ProgramData\ZeroTier\One\metrics.prom
+# Windows PowerShell (Admin)
+Invoke-RestMethod -Headers @{'X-ZT1-Auth' = "$(Get-Content C:\ProgramData\ZeroTier\One\metricstoken.secret)"; } -Uri http://localhost:9993/metrics
+```
 
 #### Available Metrics
 
@@ -174,24 +387,61 @@ Metrics are also available on disk in ZeroTier's working directory:
 | zt_peer_packets | node_id, direction | Counter | number of packets to/from a peer |
 | zt_peer_packet_errors | node_id | Counter | number of incoming packet errors from a peer |
 
-If there are other metrics you'd like to see tracked, ask us in an Issue or send us a Pull Request!
-
-### HTTP / App server
+### HTTP / App Server
 
 There is a static http file server suitable for hosting Single Page Apps at http://localhost:9993/app/<app-path>
 
-Use `zerotier-cli info -j` to find your zerotier-one service's homeDir
+---
 
-``` sh
-cd $ZT_HOME
-sudo mkdir -p app/app1
-sudo mkdir -p app/appB
-echo '<html><meta charset=utf-8><title>appA</title><body><h1>hello world A' | sudo tee app/appA/index.html 
-echo '<html><meta charset=utf-8><title>app2</title><body><h1>hello world 2' | sudo tee app/app2/index.html 
-curl -sL http://localhost:9993/app/appA http://localhost:9993/app/app2 
+## Contributing
+
+Please do pull requests off of the `dev` branch.
+
+Releases are done by merging `dev` into `main` and then tagging and doing builds.
+
+### Cleanup Old Documentation Files
+
+If you have old documentation files from previous versions, you can run the cleanup script to remove them:
+
+**Linux/macOS:**
+```bash
+chmod +x cleanup-old-docs.sh
+./cleanup-old-docs.sh
 ```
 
-Then visit [http://localhost:9993/app/app1/](http://localhost:9993/app/app1/) and [http://localhost:9993/app/appB/](http://localhost:9993/app/appB/)
+**Windows:**
+```powershell
+.\cleanup-old-docs.ps1
+```
 
-Requests to paths don't exist return the app root index.html, as is customary for SPAs. 
-If you want, you can write some javascript that talks to the service or controller [api](https://docs.zerotier.com/service/v1).
+This will remove the old `QUICK_START.md`, `GUI_README.md`, and `GUI_PROPOSAL.md` files since all their content has been consolidated into this README.
+
+### GUI Development
+
+The GUI is built using the Qt6 framework with the following components:
+
+- **BaseGUIManager**: Abstract base class defining the GUI interface
+- **QtGUIManager**: Qt6-specific implementation  
+- **MainWindow**: Main application window with network and peer tables
+- **API Integration**: Communicates with ZeroTier service via REST API
+
+---
+
+## License
+
+ZeroTier is licensed under the [BSL version 1.1](https://mariadb.com/bsl11/). See [LICENSE.txt](LICENSE.txt) and the [ZeroTier pricing page](https://www.zerotier.com/pricing) for details. ZeroTier is free to use internally in businesses and academic institutions and for non-commercial purposes.
+
+A small amount of third party code is also included in ZeroTier and is not subject to our BSL license. See [AUTHORS.md](AUTHORS.md) for a list of third party code, where it is included, and the licenses that apply to it. All of the third party code in ZeroTier is liberally licensed (MIT, BSD, Apache, public domain, etc.).
+
+---
+
+## Links
+
+- **Website**: [zerotier.com](https://www.zerotier.com)
+- **Documentation**: [docs.zerotier.com](https://docs.zerotier.com)
+- **Discussion Forum**: [discuss.zerotier.com](https://discuss.zerotier.com)
+- **Downloads**: [zerotier.com/download](https://www.zerotier.com/download)
+
+---
+
+*Transform your ZeroTier experience from command-line to point-and-click with the new GUI interface!*
