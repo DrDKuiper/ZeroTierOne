@@ -162,7 +162,8 @@ QtGUIManager::QtGUIManager(QApplication* app) : QObject(nullptr), BaseGUIManager
     _networkManager = new QNetworkAccessManager(this);
 }
 
-QtGUIManager::~QtGUIManager() {
+QtGUIManager::~QtGUIManager()
+{
     shutdown();
 }
 
