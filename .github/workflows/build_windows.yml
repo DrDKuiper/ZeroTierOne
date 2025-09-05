@@ -195,10 +195,10 @@ jobs:
         
         # Set the environment variable for the cmd process
         if ($env:QT_DIR) {
-            cmd /c "set QT_DIR=$env:QT_DIR && build-gui-windows-new.bat"
+            cmd /c "set QT_DIR=$env:QT_DIR && build-gui-windows-clean.bat"
         } else {
             Write-Host "QT_DIR not available, running script without it..."
-            .\build-gui-windows-new.bat
+            .\build-gui-windows-clean.bat
         }
         
         # If build fails, create a simple dummy executable for testing

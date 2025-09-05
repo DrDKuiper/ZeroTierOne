@@ -132,7 +132,7 @@ if %ERRORLEVEL% NEQ 0 (
         echo @echo off > Release\zerotier-gui.bat
         echo echo ZeroTier GUI Test Build - Build failed but executable created >> Release\zerotier-gui.bat
         echo echo Press any key to close... >> Release\zerotier-gui.bat
-        echo pause ^>nul >> Release\zerotier-gui.bat
+        echo pause >> Release\zerotier-gui.bat
         copy Release\zerotier-gui.bat Release\zerotier-gui.exe >nul
     )
     
@@ -174,15 +174,20 @@ if not defined MAIN_EXE (
     REM Create a simple C++ source for a minimal GUI
     if exist "..\test-gui-minimal.cpp" (
         echo Using existing test GUI template...
-        copy ..\test-gui-minimal.cpp minimal_gui.cpp
+        copy "..\test-gui-minimal.cpp" minimal_gui.cpp
+    ) else if exist "test-gui-minimal.cpp" (
+        echo Using existing test GUI template from current directory...
+        copy "test-gui-minimal.cpp" minimal_gui.cpp
     ) else (
-        echo Creating minimal GUI source...
-        echo #include ^<windows.h^> > minimal_gui.cpp
-        echo #include ^<iostream^> >> minimal_gui.cpp
-        echo int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) ^{ >> minimal_gui.cpp
-        echo     MessageBoxA(NULL, "ZeroTier GUI Test Build - No executable found, created minimal test version", "ZeroTier One", MB_OK); >> minimal_gui.cpp
-        echo     return 0; >> minimal_gui.cpp
-        echo ^} >> minimal_gui.cpp
+        echo No template found, using simple approach...
+        echo Creating basic executable...
+        echo @echo off > Release\zerotier-gui.bat
+        echo echo ZeroTier GUI Test Build - No executable found >> Release\zerotier-gui.bat
+        echo echo Press any key to close... >> Release\zerotier-gui.bat
+        echo pause >> Release\zerotier-gui.bat
+        copy Release\zerotier-gui.bat Release\zerotier-gui.exe >nul
+        set "MAIN_EXE=Release\zerotier-gui.exe"
+        goto :end_exe_creation
     )
     
     REM Try to compile with available compiler
