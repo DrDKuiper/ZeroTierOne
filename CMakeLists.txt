@@ -26,7 +26,20 @@ target_include_directories(zerotiercore PUBLIC
 
 # Service/daemon executable
 file(GLOB service_src_glob ${PROJ_DIR}/service/*.cpp)
-add_executable(zerotier-one ${PROJ_DIR}/one.cpp ${service_src_glob})
+add_executable(zerotier-one
+    ${PROJ_DIR}/one.cpp
+    ${service_src_glob}
+    ${PROJ_DIR}/osdep/OSUtils.cpp
+    ${PROJ_DIR}/controller/EmbeddedNetworkController.cpp
+    ${PROJ_DIR}/controller/CtlUtil.cpp
+    ${PROJ_DIR}/controller/DB.cpp
+    ${PROJ_DIR}/controller/DBMirrorSet.cpp
+    ${PROJ_DIR}/controller/FileDB.cpp
+    ${PROJ_DIR}/controller/LFDB.cpp
+    ${PROJ_DIR}/controller/PostgreSQL.cpp
+    ${PROJ_DIR}/controller/CV1.cpp
+    ${PROJ_DIR}/controller/CV2.cpp
+)
 target_link_libraries(zerotier-one PRIVATE zerotiercore)
 
 target_include_directories(zerotier-one PRIVATE
