@@ -90,6 +90,13 @@ public:
      */
     size_t getMFAEnabledClientsCount() const;
 
+    /**
+     * Verify MFA token (alias for verifyChallenge for compatibility)
+     */
+    bool verifyMFAToken(const std::string& challengeId, const std::string& totpCode) {
+        return verifyChallenge(challengeId, totpCode);
+    }
+
 private:
     mutable Mutex _lock;
     std::unordered_map<std::string, TOTPConfig> _clientConfigs;

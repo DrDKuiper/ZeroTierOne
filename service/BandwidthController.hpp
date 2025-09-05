@@ -20,6 +20,18 @@ namespace ZeroTier {
 class BandwidthController
 {
 public:
+    struct QoSClass {
+        std::string name;
+        int priority;           // 0-7, 7 = highest priority
+        uint64_t minBandwidth;  // Guaranteed bandwidth in bytes/sec
+        uint64_t maxBandwidth;  // Maximum bandwidth in bytes/sec
+        double maxLatency;      // Maximum acceptable latency in ms
+        bool enabled;
+
+        QoSClass() : priority(0), minBandwidth(0), maxBandwidth(0), maxLatency(0.0), enabled(false) {}
+        QoSClass(int p) : priority(p), minBandwidth(0), maxBandwidth(0), maxLatency(0.0), enabled(true) {}
+    };
+
     struct BandwidthLimit {
         uint64_t maxBytesPerSecond;
         uint64_t burstSize;
@@ -41,18 +53,6 @@ public:
         uint64_t lastReset;
         double avgLatency;
         double packetLoss;
-    };
-
-    struct QoSClass {
-        std::string name;
-        int priority;           // 0-7, 7 = highest priority
-        uint64_t minBandwidth;  // Guaranteed bandwidth in bytes/sec
-        uint64_t maxBandwidth;  // Maximum bandwidth in bytes/sec
-        double maxLatency;      // Maximum acceptable latency in ms
-        bool enabled;
-
-        QoSClass() : priority(0), minBandwidth(0), maxBandwidth(0), maxLatency(0.0), enabled(false) {}
-        QoSClass(int p) : priority(p), minBandwidth(0), maxBandwidth(0), maxLatency(0.0), enabled(true) {}
     };
 
     struct NetworkPolicy {

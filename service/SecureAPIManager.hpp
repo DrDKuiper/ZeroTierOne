@@ -77,6 +77,12 @@ public:
                                   const std::vector<std::string>& scopes);
 
     /**
+     * Generate token (compatibility alias)
+     */
+    std::string generateToken(const std::string& user_id,
+                            const std::vector<std::string>& scopes);
+
+    /**
      * Revoke token immediately
      */
     bool revokeToken(const std::string& token_id);
