@@ -40,13 +40,27 @@ set "CMAKE_DEBUG_LOG=cmake_debug.log"
 
 REM Configure with CMake with verbose output
 echo Configuring with CMake...
+echo Current directory: %CD%
+echo Parent directory contents:
+dir ..
+echo CMake command: cmake .. -G "Visual Studio 17 2022" -DCMAKE_PREFIX_PATH="%Qt6_DIR%" -DBUILD_GUI=ON -DCMAKE_VERBOSE_MAKEFILE=ON
+
 cmake .. -G "Visual Studio 17 2022" -DCMAKE_PREFIX_PATH="%Qt6_DIR%" -DBUILD_GUI=ON -DCMAKE_VERBOSE_MAKEFILE=ON > %CMAKE_DEBUG_LOG% 2>&1
 
+echo CMake exit code: %ERRORLEVEL%
 if %ERRORLEVEL% NEQ 0 (
     echo CMake configuration failed! See %CMAKE_DEBUG_LOG% for details
+    echo CMake debug log contents:
     type %CMAKE_DEBUG_LOG%
+    echo.
+    echo Generated files in build directory:
+    dir /b
     cd ..
     exit /b 1
+) else (
+    echo CMake configuration succeeded!
+    echo CMake output:
+    type %CMAKE_DEBUG_LOG%
 )
 
 REM Echo the generated CMake files
@@ -56,13 +70,30 @@ type cmake_files.txt
 
 REM Build the project with verbose output
 echo Building the project...
+echo Build command: cmake --build . --config Release --verbose
+
 cmake --build . --config Release --verbose > build_log.txt 2>&1
+echo Build exit code: %ERRORLEVEL%
 
 if %ERRORLEVEL% NEQ 0 (
     echo Build failed! See build_log.txt for details
+    echo Build log contents:
     type build_log.txt
+    echo.
+    echo Files generated during build:
+    dir /s /b *.exe 2>nul
+    echo.
+    echo Build directory structure:
+    tree /F
     cd ..
     exit /b 1
+) else (
+    echo Build succeeded!
+    echo Build output summary:
+    findstr /C:"error" /C:"warning" /C:"succeeded" /C:"failed" build_log.txt
+    echo.
+    echo Generated executables:
+    dir /s /b *.exe 2>nul
 )
 
 REM Check if GUI directory exists

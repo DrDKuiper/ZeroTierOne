@@ -121,19 +121,16 @@ jobs:
             }
             
             # Create a minimal executable for testing packaging
-            $cppFile = "build\test_gui.cpp"
-            @"
-            #include <windows.h>
-            #include <stdio.h>
-            
-            int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-                MessageBox(NULL, "ZeroTier GUI Test", "ZeroTier", MB_OK);
-                return 0;
-            }
-            "@ | Out-File -FilePath $cppFile -Encoding ASCII
+            Set-Content -Path "build\test_gui.cpp" -Value '#include <windows.h>
+        #include <stdio.h>
+        
+        int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+            MessageBox(NULL, "ZeroTier GUI Test", "ZeroTier", MB_OK);
+            return 0;
+        }'
             
             Write-Host "Compiling test GUI executable..."
-            & cl.exe /Fe:"build\gui\Release\zerotier-gui.exe" $cppFile /link /SUBSYSTEM:WINDOWS
+            & cl.exe /Fe:"build\gui\Release\zerotier-gui.exe" "build\test_gui.cpp" /link /SUBSYSTEM:WINDOWS
             
             if (Test-Path "build\gui\Release\zerotier-gui.exe") {
                 Write-Host "Test GUI executable created successfully."

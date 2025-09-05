@@ -2,7 +2,7 @@ on:
   pull_request:
   push:
   workflow_dispatch:
-
+name: Validate ZeroTierOne
 jobs:
   build_ubuntu:
     runs-on: ubuntu-latest
