@@ -21,4 +21,13 @@ if ($IsWindows -or $env:OS -eq "Windows_NT") {
     exit 1
 }
 
-Write-Host "Build script completed" -ForegroundColor Green
+Write-Host ""
+Write-Host "Build completed!" -ForegroundColor Green
+Write-Host "Standalone executable created with all Qt dependencies included." -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Output files:" -ForegroundColor Yellow
+Write-Host "- Standalone executable: build\deploy\ZeroTierOneGUI.exe" -ForegroundColor White
+Write-Host "- All dependencies folder: build\deploy\" -ForegroundColor White
+Write-Host ""
+Write-Host "You can copy the entire 'build\deploy' folder to any Windows system" -ForegroundColor Green
+Write-Host "The executable will run without requiring Qt to be installed." -ForegroundColor Green

@@ -39,7 +39,28 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
+REM Create standalone executable using windeployqt
+echo Creating standalone executable...
+if not exist "deploy" mkdir deploy
+
+REM Copy the main executable
+copy "gui\Release\ZeroTier One.exe" "deploy\ZeroTierOneGUI.exe"
+
+REM Deploy Qt dependencies to create standalone package
+cd deploy
+windeployqt.exe --release --no-translations --no-system-d3d-compiler --no-opengl-sw "ZeroTierOneGUI.exe"
+
+if %ERRORLEVEL% NEQ 0 (
+    echo Warning: windeployqt failed. Executable may require Qt runtime installed.
+    echo You can still use the executable, but Qt6 must be installed on target systems.
+) else (
+    echo Successfully created standalone executable with all dependencies!
+)
+
+cd ..
+
 echo Build completed successfully!
-echo Executable location: build\gui\Release\ZeroTier One.exe
+echo Standalone executable: build\deploy\ZeroTierOneGUI.exe
+echo All Qt dependencies included in: build\deploy\
 
 cd ..

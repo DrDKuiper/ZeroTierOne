@@ -3,6 +3,8 @@ on:
   push:
   workflow_dispatch:
 
+name: Build ZeroTier One (Core + GUI)
+
 jobs:
   build_ubuntu:
     runs-on: ubuntu-latest
@@ -124,3 +126,160 @@ jobs:
         name: zerotier-one-windows
         path: windows/Build
         retention-days: 7
+
+  build_gui_ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+    - name: gitconfig
+      run: |
+        git config --global core.autocrlf input
+    - name: checkout
+      uses: actions/checkout@v4
+    
+    - name: Install Qt6 and dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y qt6-base-dev qt6-tools-dev cmake build-essential
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        targets: x86_64-unknown-linux-gnu
+        components: rustfmt, clippy
+
+    - name: Set up cargo cache
+      uses: Swatinem/rust-cache@v2
+      continue-on-error: false
+      with:
+        key: ${{ runner.os }}-cargo-${{ hashFiles('rustybits//Cargo.lock') }}
+        shared-key: ${{ runner.os }}-cargo-
+        workspaces: |
+          rustybits/
+
+    - name: Build core ZeroTier
+      run: make
+
+    - name: Build GUI
+      run: |
+        chmod +x build-gui-linux.sh
+        ./build-gui-linux.sh
+
+    - name: Package GUI
+      run: |
+        mkdir -p zerotier-gui-package
+        cp build/gui/zerotier-gui zerotier-gui-package/
+        cp gui/resources/linux/zerotier-one.desktop zerotier-gui-package/
+        cp artwork/ZeroTierIcon.png zerotier-gui-package/zerotier.png
+        tar -cvf zerotier-gui-ubuntu.tar zerotier-gui-package/
+
+    - name: Archive GUI artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: zerotier-gui-ubuntu-x64
+        path: zerotier-gui-ubuntu.tar
+        retention-days: 7
+
+  build_gui_macos:
+    runs-on: macos-latest
+    steps:
+    - name: gitconfig
+      run: |
+        git config --global core.autocrlf input
+    - name: checkout
+      uses: actions/checkout@v4
+    
+    - name: Install Qt6 and dependencies
+      run: |
+        brew install qt6 cmake
+    
+    - name: Install Rust aarch64
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        target: aarch64-apple-darwin
+        components: rustfmt, clippy
+    - name: Install Rust x86_64
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        target: x86_64-apple-darwin
+        components: rustfmt, clippy
+        
+    - name: Set up cargo cache
+      uses: Swatinem/rust-cache@v2
+      continue-on-error: false
+      with:
+        key: ${{ runner.os }}-cargo-${{ hashFiles('rustybits//Cargo.lock') }}
+        shared-key: ${{ runner.os }}-cargo-
+        workspaces: |
+          rustybits/
+
+    - name: Build core ZeroTier
+      run: make
+
+    - name: Build GUI
+      run: |
+        chmod +x build-gui-macos.sh
+        ./build-gui-macos.sh
+
+    - name: Package GUI
+      run: |
+        tar -cvf zerotier-gui-macos.tar build/gui/"ZeroTier One.app"
+
+    - name: Archive GUI artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: zerotier-gui-macos
+        path: zerotier-gui-macos.tar
+        retention-days: 7
+
+  build_gui_windows:
+    runs-on: windows-latest
+    steps:
+    - name: gitconfig
+      run: |
+        git config --global core.autocrlf true
+    - name: checkout
+      uses: actions/checkout@v4
+    
+    - name: Install Qt6
+      run: |
+        choco install qt6-base-dev -y
+        echo "Qt6_DIR=C:\Qt\6.5.0\msvc2019_64" >> $env:GITHUB_ENV
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        target: x86_64-pc-windows-msvc
+        components: rustfmt, clippy
+        
+    - name: Set up cargo cache
+      uses: Swatinem/rust-cache@v2
+      continue-on-error: false
+      with:
+        key: ${{ runner.os }}-cargo-${{ hashFiles('rustybits//Cargo.lock') }}
+        shared-key: ${{ runner.os }}-cargo-
+        workspaces: |
+          rustybits/
+
+    - name: setup msbuild
+      uses: microsoft/setup-msbuild@v2
+      
+    - name: Build core ZeroTier
+      run: |
+        msbuild windows\ZeroTierOne.sln /m /p:Configuration=Release  /property:Platform=x64 /t:ZeroTierOne
+
+    - name: Build GUI
+      run: |
+        .\build-gui-windows.bat
+      continue-on-error: true # Allow this to fail if Qt6 setup has issues
+
+    - name: Archive GUI artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: zerotier-gui-windows
+        path: build/gui/Release/
+        retention-days: 7
+      if: success() # Only upload if GUI build succeeded

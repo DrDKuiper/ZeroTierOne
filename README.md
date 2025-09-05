@@ -1,5 +1,7 @@
 # ZeroTier One - Global Area Networking with GUI
 
+![Build Status](https://github.com/DrDKuiper/ZeroTierOne/actions/workflows/build.yml/badge.svg)
+
 *This comprehensive document covers both the core ZeroTier One functionality and the new graphical user interface (GUI) implementation.*
 
 ## Overview
@@ -173,7 +175,7 @@ sudo pacman -S qt6-base qt6-tools cmake gcc
    build-gui-windows.bat
    ```
 
-The executable will be created at `build\gui\Release\ZeroTier One.exe`
+**Output**: Standalone executable at `build\deploy\ZeroTierOneGUI.exe` with all Qt dependencies included in the `build\deploy\` folder. Copy the entire folder to any Windows system to run without installing Qt.
 
 #### macOS
 1. Install Xcode command line tools:
@@ -190,7 +192,7 @@ The executable will be created at `build\gui\Release\ZeroTier One.exe`
    ./build-gui-macos.sh
    ```
 
-The application bundle will be created at `build/gui/ZeroTier One.app`
+**Output**: Standalone app bundle at `build/deploy/ZeroTierOneGUI.app` with all Qt frameworks included. Copy this single .app file to any macOS system to run.
 
 #### Linux
 1. Install dependencies (see prerequisites above)
@@ -200,7 +202,17 @@ The application bundle will be created at `build/gui/ZeroTier One.app`
    ./build-gui-linux.sh
    ```
 
-The executable will be created at `build/gui/zerotier-gui`
+**Output**: 
+- **Best option**: Standalone AppImage at `build/deploy/ZeroTierOneGUI.AppImage` (single file executable that runs on any Linux system)
+- **Fallback**: Regular executable at `build/deploy/ZeroTierOneGUI` (may require Qt6 on target systems)
+
+### Alternative: Truly Standalone Build
+For a minimal dependency executable (Linux only):
+```bash
+chmod +x build-standalone.sh
+./build-standalone.sh
+```
+**Output**: Single executable with static linking at `deploy-standalone/ZeroTierOneGUI-standalone`
 
 ---
 

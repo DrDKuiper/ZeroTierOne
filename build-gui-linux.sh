@@ -74,19 +74,61 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-echo "Build completed successfully!"
-echo "Executable location: build/gui/zerotier-gui"
+# Create standalone executable
+echo "Creating standalone executable..."
+mkdir -p deploy
 
-# Optional: Create AppImage
-if command -v linuxdeploy-x86_64.AppImage &> /dev/null; then
-    echo "Creating AppImage..."
+# Copy the executable
+cp gui/zerotier-gui deploy/ZeroTierOneGUI
+
+# Try to create an AppImage (portable single file)
+if command -v linuxdeploy &> /dev/null || command -v linuxdeploy-x86_64.AppImage &> /dev/null; then
+    echo "Creating AppImage (single file executable)..."
+    
+    # Create AppImage directory structure
     mkdir -p AppDir/usr/bin
-    cp gui/zerotier-gui AppDir/usr/bin/
-    cp ../gui/resources/linux/zerotier-one.desktop AppDir/
+    mkdir -p AppDir/usr/share/applications
     mkdir -p AppDir/usr/share/pixmaps
+    
+    # Copy files
+    cp gui/zerotier-gui AppDir/usr/bin/ZeroTierOneGUI
+    
+    # Create desktop file
+    cat > AppDir/usr/share/applications/zerotier-one.desktop << EOF
+[Desktop Entry]
+Type=Application
+Name=ZeroTier One
+Comment=ZeroTier One Network Manager
+Exec=ZeroTierOneGUI
+Icon=zerotier
+Categories=Network;
+EOF
+    
+    # Copy icon
     cp ../artwork/ZeroTierIcon.png AppDir/usr/share/pixmaps/zerotier.png
     
-    linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
+    # Create AppImage
+    if command -v linuxdeploy &> /dev/null; then
+        linuxdeploy --appdir AppDir --output appimage
+    else
+        linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
+    fi
+    
+    # Move AppImage to deploy directory
+    if [ -f *.AppImage ]; then
+        mv *.AppImage deploy/ZeroTierOneGUI.AppImage
+        echo "Successfully created standalone AppImage!"
+        echo "Single file executable: build/deploy/ZeroTierOneGUI.AppImage"
+        echo "This file contains all dependencies and can run on any Linux system"
+    else
+        echo "AppImage creation failed, but you still have the regular executable"
+        echo "Regular executable: build/deploy/ZeroTierOneGUI"
+    fi
+else
+    echo "linuxdeploy not found. Creating basic standalone executable..."
+    echo "Regular executable: build/deploy/ZeroTierOneGUI"
+    echo "Note: This may require Qt6 to be installed on target systems"
+    echo "To create a fully portable AppImage, install linuxdeploy"
 fi
 
 cd ..

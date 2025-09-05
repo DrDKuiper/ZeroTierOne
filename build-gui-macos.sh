@@ -37,8 +37,25 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-echo "Build completed successfully!"
-echo "Application bundle location: build/gui/ZeroTier One.app"
+# Create standalone app bundle using macdeployqt
+echo "Creating standalone app bundle..."
+mkdir -p deploy
+
+# Copy the app bundle
+cp -R "gui/ZeroTier One.app" "deploy/ZeroTierOneGUI.app"
+
+# Deploy Qt frameworks and create standalone bundle
+macdeployqt "deploy/ZeroTierOneGUI.app" -always-overwrite
+
+if [ $? -eq 0 ]; then
+    echo "Successfully created standalone app bundle!"
+    echo "Standalone app: build/deploy/ZeroTierOneGUI.app"
+    echo "All Qt frameworks included in the app bundle"
+else
+    echo "Warning: macdeployqt failed. App may require Qt runtime installed."
+    echo "You can still use the app, but Qt6 must be installed on target systems."
+    echo "Basic app bundle: build/deploy/ZeroTierOneGUI.app"
+fi
 
 # Optional: Create DMG
 if command -v create-dmg &> /dev/null; then
