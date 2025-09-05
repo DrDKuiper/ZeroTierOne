@@ -312,9 +312,13 @@ jobs:
       uses: actions/checkout@v4
     
     - name: Install Qt6
-      run: |
-        choco install qt6-base-dev -y
-        echo "Qt6_DIR=C:\Qt\6.5.0\msvc2019_64" >> $env:GITHUB_ENV
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.5.0'
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2019_64'
+        modules: 'qtbase qttools'
     
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
