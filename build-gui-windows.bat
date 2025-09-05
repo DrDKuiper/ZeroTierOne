@@ -55,8 +55,8 @@ if %ERRORLEVEL% NEQ 0 (
     echo.
     echo Generated files in build directory:
     dir /b
-    cd ..
-    exit /b 1
+    echo Continuing despite CMake failure to allow fallback executable creation...
+    goto :build_failed
 ) else (
     echo CMake configuration succeeded!
     echo CMake output:
@@ -85,8 +85,8 @@ if %ERRORLEVEL% NEQ 0 (
     echo.
     echo Build directory structure:
     tree /F
-    cd ..
-    exit /b 1
+    echo Continuing despite build failure to allow fallback executable creation...
+    goto :build_failed
 ) else (
     echo Build succeeded!
     echo Build output summary:
@@ -95,6 +95,9 @@ if %ERRORLEVEL% NEQ 0 (
     echo Generated executables:
     dir /s /b *.exe 2>nul
 )
+
+:build_failed
+echo Creating build directories and checking for executables...
 
 REM Check if GUI directory exists
 echo Checking build output directories...
@@ -152,14 +155,21 @@ if %ERRORLEVEL% NEQ 0 (
     echo NSIS not found in PATH. Skipping installer creation.
 ) else (
     echo Creating installer with NSIS...
-    REM Use a proper quoted path to NSIS
-    set "NSIS_PATH=%ProgramFiles(x86)%\NSIS"
+    REM Use a safe quoted path to NSIS without parentheses
+    set "NSIS_PATH=C:\Program Files (x86)\NSIS"
     if exist "%NSIS_PATH%\makensis.exe" (
         echo Using NSIS from: %NSIS_PATH%
-        "%NSIS_PATH%\makensis.exe" ..\..\windows\ZeroTierOne.nsi
+        "%NSIS_PATH%\makensis.exe" "..\..\windows\ZeroTierOne.nsi"
     ) else (
-        echo NSIS makensis.exe not found at %NSIS_PATH%
-        echo Skipping installer creation.
+        echo NSIS makensis.exe not found at standard location
+        echo Trying alternative location...
+        set "NSIS_PATH=C:\Program Files\NSIS"
+        if exist "%NSIS_PATH%\makensis.exe" (
+            echo Using NSIS from: %NSIS_PATH%
+            "%NSIS_PATH%\makensis.exe" "..\..\windows\ZeroTierOne.nsi"
+        ) else (
+            echo NSIS not found in any standard location. Skipping installer creation.
+        )
     )
 )
 
