@@ -56,6 +56,7 @@
 #include "../version.h"
 #include "OneService.hpp"
 #include "SoftwareUpdater.hpp"
+#include "SecureAPIManager.hpp"
 
 #include <cpp-httplib/httplib.h>
 
