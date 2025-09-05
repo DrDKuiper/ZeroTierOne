@@ -64,6 +64,23 @@ if %ERRORLEVEL% NEQ 0 (
     echo Successfully created standalone executable with all dependencies!
 )
 
+REM Check for NSIS (Nullsoft Scriptable Install System)
+where makensis >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo NSIS not found in PATH. Skipping installer creation.
+) else (
+    echo Creating installer with NSIS...
+    REM Use a proper quoted path to NSIS
+    set "NSIS_PATH=%ProgramFiles(x86)%\NSIS"
+    if exist "%NSIS_PATH%\makensis.exe" (
+        echo Using NSIS from: %NSIS_PATH%
+        "%NSIS_PATH%\makensis.exe" ..\..\windows\ZeroTierOne.nsi
+    ) else (
+        echo NSIS makensis.exe not found at %NSIS_PATH%
+        echo Skipping installer creation.
+    )
+)
+
 cd ..
 
 echo Build completed successfully!

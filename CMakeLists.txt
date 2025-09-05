@@ -6,14 +6,25 @@ project (zerotierone VERSION 1.14.0)
 # Options
 option(BUILD_GUI "Build the GUI application" OFF)
 
+# Set C++17 as the standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 set (PROJ_DIR ${PROJECT_SOURCE_DIR})
-set (ZT_DEFS -std=c++11)
+set (ZT_DEFS)
 
 # Core library
 file(GLOB core_src_glob ${PROJ_DIR}/node/*.cpp)
 add_library(zerotiercore STATIC ${core_src_glob})
 
 target_compile_options(zerotiercore PRIVATE ${ZT_DEFS})
+
+# Add C++17 required definitions
+if(APPLE)
+    # Ensure proper shared_mutex support on macOS
+    target_compile_definitions(zerotiercore PRIVATE _LIBCPP_ENABLE_SHARED_MUTEX)
+endif()
 target_include_directories(zerotiercore PUBLIC 
     ${PROJ_DIR}/include
     ${PROJ_DIR}/ext
