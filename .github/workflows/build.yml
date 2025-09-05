@@ -141,6 +141,14 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y qt6-base-dev qt6-tools-dev cmake build-essential
     
+    - name: Install AppImage tools
+      run: |
+        # Download linuxdeploy for AppImage creation
+        wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+        chmod +x linuxdeploy-x86_64.AppImage
+        sudo mv linuxdeploy-x86_64.AppImage /usr/local/bin/linuxdeploy
+        echo "linuxdeploy installed for AppImage creation"
+    
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
@@ -168,9 +176,33 @@ jobs:
     - name: Package GUI
       run: |
         mkdir -p zerotier-gui-package
-        cp build/gui/zerotier-gui zerotier-gui-package/
-        cp gui/resources/linux/zerotier-one.desktop zerotier-gui-package/
-        cp artwork/ZeroTierIcon.png zerotier-gui-package/zerotier.png
+        
+        # Check for AppImage first (preferred standalone format)
+        if [ -f "build/deploy/ZeroTierOneGUI.AppImage" ]; then
+          echo "Packaging standalone AppImage..."
+          cp build/deploy/ZeroTierOneGUI.AppImage zerotier-gui-package/
+          echo "Standalone AppImage created: ZeroTierOneGUI.AppImage" > zerotier-gui-package/README.txt
+          echo "This file contains all dependencies and runs on any Linux system." >> zerotier-gui-package/README.txt
+          echo "Usage: chmod +x ZeroTierOneGUI.AppImage && ./ZeroTierOneGUI.AppImage" >> zerotier-gui-package/README.txt
+        elif [ -f "build/deploy/ZeroTierOneGUI" ]; then
+          echo "Packaging standalone executable..."
+          cp build/deploy/ZeroTierOneGUI zerotier-gui-package/
+          cp gui/resources/linux/zerotier-one.desktop zerotier-gui-package/
+          cp artwork/ZeroTierIcon.png zerotier-gui-package/zerotier.png
+          echo "Standalone executable created: ZeroTierOneGUI" > zerotier-gui-package/README.txt
+          echo "May require Qt6 to be installed on target systems." >> zerotier-gui-package/README.txt
+        elif [ -f "build/gui/zerotier-gui" ]; then
+          echo "Packaging basic executable..."
+          cp build/gui/zerotier-gui zerotier-gui-package/ZeroTierOneGUI
+          cp gui/resources/linux/zerotier-one.desktop zerotier-gui-package/
+          cp artwork/ZeroTierIcon.png zerotier-gui-package/zerotier.png
+          echo "Basic executable created: ZeroTierOneGUI" > zerotier-gui-package/README.txt
+          echo "Requires Qt6 to be installed on target systems." >> zerotier-gui-package/README.txt
+        else
+          echo "Error: No GUI executable found!"
+          exit 1
+        fi
+        
         tar -cvf zerotier-gui-ubuntu.tar zerotier-gui-package/
 
     - name: Archive GUI artifacts
@@ -191,7 +223,17 @@ jobs:
     
     - name: Install Qt6 and dependencies
       run: |
-        brew install qt6 cmake
+        # Check if cmake is working
+        if command -v cmake >/dev/null 2>&1; then
+          echo "CMake is already available: $(cmake --version | head -1)"
+        else
+          echo "Installing CMake..."
+          brew install cmake
+        fi
+        
+        # Install Qt6
+        echo "Installing Qt6..."
+        brew install qt6
     
     - name: Install Rust aarch64
       uses: dtolnay/rust-toolchain@stable
@@ -225,7 +267,17 @@ jobs:
 
     - name: Package GUI
       run: |
-        tar -cvf zerotier-gui-macos.tar build/gui/"ZeroTier One.app"
+        # Package the standalone app bundle created by build script
+        if [ -d "build/deploy/ZeroTierOneGUI.app" ]; then
+          tar -cvf zerotier-gui-macos.tar build/deploy/ZeroTierOneGUI.app
+          echo "Packaged standalone app bundle: build/deploy/ZeroTierOneGUI.app"
+        elif [ -d "build/gui/ZeroTier One.app" ]; then
+          tar -cvf zerotier-gui-macos.tar build/gui/"ZeroTier One.app"
+          echo "Packaged basic app bundle: build/gui/ZeroTier One.app"
+        else
+          echo "Error: No app bundle found!"
+          exit 1
+        fi
 
     - name: Archive GUI artifacts
       uses: actions/upload-artifact@v4
@@ -276,10 +328,26 @@ jobs:
         .\build-gui-windows.bat
       continue-on-error: true # Allow this to fail if Qt6 setup has issues
 
+    - name: Package GUI
+      run: |
+        if (Test-Path "build\deploy\ZeroTierOneGUI.exe") {
+          Write-Host "Packaging standalone executable with dependencies..."
+          Compress-Archive -Path "build\deploy\*" -DestinationPath "zerotier-gui-windows.zip"
+          Write-Host "Standalone package created: zerotier-gui-windows.zip"
+        } elseif (Test-Path "build\gui\Release\ZeroTier One.exe") {
+          Write-Host "Packaging basic executable..."
+          Compress-Archive -Path "build\gui\Release\*" -DestinationPath "zerotier-gui-windows.zip"
+          Write-Host "Basic package created: zerotier-gui-windows.zip"
+        } else {
+          Write-Host "Error: No GUI executable found!"
+          exit 1
+        }
+      if: success() # Only package if GUI build succeeded
+
     - name: Archive GUI artifacts
       uses: actions/upload-artifact@v4
       with:
         name: zerotier-gui-windows
-        path: build/gui/Release/
+        path: zerotier-gui-windows.zip
         retention-days: 7
       if: success() # Only upload if GUI build succeeded
