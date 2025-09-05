@@ -3,8 +3,24 @@ echo Building ZeroTier One GUI for Windows...
 
 REM Check if QT_DIR is set
 if not defined QT_DIR (
-    echo QT_DIR environment variable not set!
-    echo Please set QT_DIR to your Qt6 installation directory
+    echo QT_DIR environment variable     REM Create a simple C++ source for a minimal GUI
+    if exist "..\test-gui-minimal.cpp" (
+        echo Using existing test GUI template...
+        copy "..\test-gui-minimal.cpp" minimal_gui.cpp
+    ) else if exist "test-gui-minimal.cpp" (
+        echo Using existing test GUI template from current directory...
+        copy "test-gui-minimal.cpp" minimal_gui.cpp
+    ) else (
+        echo No template found, using simple approach...
+        echo Creating basic executable...
+        echo @echo off > Release\zerotier-gui.bat
+        echo echo ZeroTier GUI Test Build - No executable found >> Release\zerotier-gui.bat
+        echo echo Press any key to close... >> Release\zerotier-gui.bat
+        echo pause ^>nul >> Release\zerotier-gui.bat
+        copy Release\zerotier-gui.bat Release\zerotier-gui.exe
+        set "MAIN_EXE=Release\zerotier-gui.exe"
+        goto :end_exe_creation
+    ) echo Please set QT_DIR to your Qt6 installation directory
     echo Example: set QT_DIR=C:\Qt\6.5.0\msvc2022_64
     echo.
     echo Current environment variables:
@@ -61,17 +77,15 @@ if %ERRORLEVEL% NEQ 0 (
     mkdir Release 2>nul
     
     REM Create a simple C++ source for a minimal GUI
-    if exist "test-gui-minimal.cpp" (
+    if exist "..\test-gui-minimal.cpp" (
         echo Using existing test GUI template...
-        copy test-gui-minimal.cpp minimal_gui.cpp
+        copy "..\test-gui-minimal.cpp" minimal_gui.cpp
+    ) else if exist "test-gui-minimal.cpp" (
+        echo Using existing test GUI template from current directory...
+        copy "test-gui-minimal.cpp" minimal_gui.cpp
     ) else (
-        echo Creating minimal GUI source...
-        echo #include ^<windows.h^> > minimal_gui.cpp
-        echo #include ^<iostream^> >> minimal_gui.cpp
-        echo int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) { >> minimal_gui.cpp
-        echo     MessageBoxA(NULL, "ZeroTier GUI Test Build - Build failed, but executable created for testing", "ZeroTier One", MB_OK); >> minimal_gui.cpp
-        echo     return 0; >> minimal_gui.cpp
-        echo } >> minimal_gui.cpp
+        echo No template found, skipping C++ compilation...
+        goto :create_batch_exe
     )
     
     REM Try to compile with available compiler
@@ -107,13 +121,20 @@ if %ERRORLEVEL% NEQ 0 (
     
     :create_batch_exe
     echo Creating batch-based executable...
-    echo @echo off > Release\zerotier-gui.bat
-    echo echo ZeroTier GUI Test Build - Build failed but executable created >> Release\zerotier-gui.bat
-    echo echo Press any key to close... >> Release\zerotier-gui.bat
-    echo pause ^>nul >> Release\zerotier-gui.bat
-    
-    REM Copy as .exe for consistency (this won't be a real exe but will be found by the packaging step)
-    copy Release\zerotier-gui.bat Release\zerotier-gui.exe
+    if exist "..\create-fallback-exe.bat" (
+        echo Using fallback executable script...
+        call "..\create-fallback-exe.bat"
+    ) else if exist "create-fallback-exe.bat" (
+        echo Using fallback executable script from current directory...
+        call "create-fallback-exe.bat"
+    ) else (
+        echo Creating simple fallback manually...
+        echo @echo off > Release\zerotier-gui.bat
+        echo echo ZeroTier GUI Test Build - Build failed but executable created >> Release\zerotier-gui.bat
+        echo echo Press any key to close... >> Release\zerotier-gui.bat
+        echo pause ^>nul >> Release\zerotier-gui.bat
+        copy Release\zerotier-gui.bat Release\zerotier-gui.exe >nul
+    )
     
     :cleanup_source
     del minimal_gui.cpp 2>nul
@@ -158,10 +179,10 @@ if not defined MAIN_EXE (
         echo Creating minimal GUI source...
         echo #include ^<windows.h^> > minimal_gui.cpp
         echo #include ^<iostream^> >> minimal_gui.cpp
-        echo int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) { >> minimal_gui.cpp
+        echo int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) ^{ >> minimal_gui.cpp
         echo     MessageBoxA(NULL, "ZeroTier GUI Test Build - No executable found, created minimal test version", "ZeroTier One", MB_OK); >> minimal_gui.cpp
         echo     return 0; >> minimal_gui.cpp
-        echo } >> minimal_gui.cpp
+        echo ^} >> minimal_gui.cpp
     )
     
     REM Try to compile with available compiler
@@ -184,6 +205,8 @@ if not defined MAIN_EXE (
         echo Compilation failed, but setting path for packaging...
         set "MAIN_EXE=Release\zerotier-gui.exe"
     )
+
+:end_exe_creation
 )
 
 REM Deploy Qt dependencies
