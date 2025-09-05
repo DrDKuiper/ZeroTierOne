@@ -7,10 +7,9 @@
 
 namespace ZeroTier {
 
-BaseGUIManager::~BaseGUIManager() {
-    if (_running) {
-        shutdown();
-    }
+BaseGUIManager::~BaseGUIManager()
+{
+    // The shutdown() call was moved to the destructor of the platform-specific GUIManager
 }
 
 // Conectar ao serviço ZeroTier
