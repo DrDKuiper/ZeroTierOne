@@ -6,7 +6,25 @@ if not defined QT_DIR (
     echo QT_DIR environment variable not set!
     echo Please set QT_DIR to your Qt6 installation directory
     echo Example: set QT_DIR=C:\Qt\6.5.0\msvc2022_64
-    exit /b 1
+    echo.
+    echo Current environment variables:
+    set | findstr /i qt
+    echo.
+    echo Checking common Qt installation paths...
+    if exist "C:\Qt\6.5.0\msvc2022_64" (
+        echo Found Qt at: C:\Qt\6.5.0\msvc2022_64
+        set "QT_DIR=C:\Qt\6.5.0\msvc2022_64"
+        echo Using found Qt installation
+    ) else if exist "C:\Qt\6.5.0\msvc2019_64" (
+        echo Found Qt at: C:\Qt\6.5.0\msvc2019_64
+        set "QT_DIR=C:\Qt\6.5.0\msvc2019_64"
+        echo Using found Qt installation
+    ) else (
+        echo No Qt installation found in common paths
+        echo Available directories in C:\Qt:
+        dir /b "C:\Qt\" 2>nul
+        exit /b 1
+    )
 )
 
 echo Using Qt from: %QT_DIR%

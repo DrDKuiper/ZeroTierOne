@@ -70,6 +70,61 @@ jobs:
         target: 'desktop'
         arch: 'win64_msvc2019_64'
         tools: 'tools_cmake'
+        
+    - name: Set Qt environment variables
+      shell: powershell
+      run: |
+        Write-Host "Setting up Qt environment variables..."
+        
+        # The install-qt-action sets Qt6_DIR automatically
+        $qtPath = $env:Qt6_DIR
+        Write-Host "Qt6_DIR from action: $qtPath"
+        
+        if (-not $qtPath -or -not (Test-Path $qtPath)) {
+            # Try to find Qt in common locations
+            $commonPaths = @(
+                "$env:RUNNER_TOOL_CACHE\Qt\6.5.0\msvc2019_64",
+                "$env:RUNNER_TOOL_CACHE\Qt\6.5.0\msvc2022_64",
+                "C:\Qt\6.5.0\msvc2019_64",
+                "C:\Qt\6.5.0\msvc2022_64"
+            )
+            
+            foreach ($path in $commonPaths) {
+                if (Test-Path $path) {
+                    $qtPath = $path
+                    Write-Host "Found Qt at fallback location: $qtPath"
+                    break
+                }
+            }
+        }
+        
+        if ($qtPath -and (Test-Path $qtPath)) {
+            Write-Host "Using Qt installation at: $qtPath"
+            
+            # Set QT_DIR for future steps
+            echo "QT_DIR=$qtPath" >> $env:GITHUB_ENV
+            
+            # Set QT_DIR for current session
+            $env:QT_DIR = $qtPath
+            
+            # Verify Qt tools exist
+            $qmakePath = "$qtPath\bin\qmake.exe"
+            $cmakePath = "$qtPath\bin\cmake.exe"
+            $windeployqtPath = "$qtPath\bin\windeployqt.exe"
+            
+            Write-Host "Qt tools check:"
+            Write-Host "  qmake: $(if (Test-Path $qmakePath) { 'Found' } else { 'Missing' })"
+            Write-Host "  cmake: $(if (Test-Path $cmakePath) { 'Found' } else { 'Missing' })"
+            Write-Host "  windeployqt: $(if (Test-Path $windeployqtPath) { 'Found' } else { 'Missing' })"
+            
+        } else {
+            Write-Host "ERROR: Qt6 installation not found!"
+            Write-Host "Searched paths:"
+            foreach ($path in $commonPaths) {
+                Write-Host "  $path - $(if (Test-Path $path) { 'Found' } else { 'Not found' })"
+            }
+            exit 1
+        }
     
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
@@ -100,15 +155,22 @@ jobs:
       shell: bash
 
     - name: Build GUI
+      shell: powershell
       run: |
         Write-Host "Starting GUI build with detailed logging..."
+        Write-Host "Environment variables:"
+        Write-Host "QT_DIR: $env:QT_DIR"
         Write-Host "Qt6_DIR: $env:Qt6_DIR"
+        Write-Host "PATH contains Qt: $($env:PATH -split ';' | Where-Object { $_ -like '*Qt*' })"
+        
         Write-Host "Checking Qt installation..."
-        if (Test-Path "$env:Qt6_DIR") {
-            Write-Host "Qt6 found at: $env:Qt6_DIR"
-            Get-ChildItem -Path "$env:Qt6_DIR\bin" | Select-Object Name | Format-Table -AutoSize
+        if ($env:QT_DIR -and (Test-Path "$env:QT_DIR")) {
+            Write-Host "Qt6 found at: $env:QT_DIR"
+            Get-ChildItem -Path "$env:QT_DIR\bin" -ErrorAction SilentlyContinue | Select-Object Name | Format-Table -AutoSize
         } else {
-            Write-Host "Qt6_DIR path does not exist!"
+            Write-Host "QT_DIR not set or path does not exist!"
+            Write-Host "Available Qt installations:"
+            Get-ChildItem -Path "C:\" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*Qt*" } | Select-Object FullName
         }
         
         # Setup Visual Studio environment
@@ -129,7 +191,15 @@ jobs:
         }
         
         # Try building with the script
-        .\build-gui-windows-new.bat
+        Write-Host "Passing QT_DIR to build script: $env:QT_DIR"
+        
+        # Set the environment variable for the cmd process
+        if ($env:QT_DIR) {
+            cmd /c "set QT_DIR=$env:QT_DIR && build-gui-windows-new.bat"
+        } else {
+            Write-Host "QT_DIR not available, running script without it..."
+            .\build-gui-windows-new.bat
+        }
         
         # If build fails, create a simple dummy executable for testing
         if (-not (Test-Path "build\Release\zerotier-gui.exe")) {
