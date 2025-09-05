@@ -26,11 +26,48 @@ target_include_directories(zerotiercore PUBLIC
 
 # Service/daemon executable
 file(GLOB service_src_glob ${PROJ_DIR}/service/*.cpp)
-file(GLOB osdep_src_glob ${PROJ_DIR}/osdep/*.cpp)
+
+# Platform-specific source files
+set(osdep_src "")
+if(UNIX)
+    file(GLOB osdep_unix_src 
+        ${PROJ_DIR}/osdep/OSUtils.cpp
+        ${PROJ_DIR}/osdep/Http.cpp
+        ${PROJ_DIR}/osdep/Phy.cpp
+        ${PROJ_DIR}/osdep/Arp.cpp
+    )
+    list(APPEND osdep_src ${osdep_unix_src})
+
+    if(APPLE)
+        file(GLOB osdep_bsd_src 
+            ${PROJ_DIR}/osdep/MacEthernetTap.cpp
+            ${PROJ_DIR}/osdep/MacKextEthernetTap.cpp
+            ${PROJ_DIR}/osdep/MacMDNSResponder.cpp
+        )
+        list(APPEND osdep_src ${osdep_bsd_src})
+    else()
+        # Linux
+        file(GLOB osdep_linux_src 
+            ${PROJ_DIR}/osdep/LinuxEthernetTap.cpp
+            ${PROJ_DIR}/osdep/LinuxNetLink.cpp
+            ${PROJ_DIR}/osdep/ManagedRoute.cpp
+        )
+        list(APPEND osdep_src ${osdep_linux_src})
+    endif()
+elseif(WIN32)
+    file(GLOB osdep_windows_src 
+        ${PROJ_DIR}/osdep/OSUtils.cpp
+        ${PROJ_DIR}/osdep/WindowsEthernetTap.cpp
+        ${PROJ_DIR}/osdep/WindowsMDNSResponder.cpp
+        ${PROJ_DIR}/osdep/Http.cpp
+    )
+    list(APPEND osdep_src ${osdep_windows_src})
+endif()
+
 add_executable(zerotier-one
     ${PROJ_DIR}/one.cpp
     ${service_src_glob}
-    ${osdep_src_glob}
+    ${osdep_src}
     ${PROJ_DIR}/controller/EmbeddedNetworkController.cpp
     ${PROJ_DIR}/controller/CtlUtil.cpp
     ${PROJ_DIR}/controller/DB.cpp
@@ -41,7 +78,11 @@ add_executable(zerotier-one
     ${PROJ_DIR}/controller/CV1.cpp
     ${PROJ_DIR}/controller/CV2.cpp
 )
-target_link_libraries(zerotier-one PRIVATE zerotiercore ${CMAKE_CURRENT_SOURCE_DIR}/ext/http-parser/http_parser.o)
+# Compile the http-parser library
+add_library(http_parser STATIC ${CMAKE_CURRENT_SOURCE_DIR}/ext/http-parser/http_parser.c)
+target_include_directories(http_parser PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ext/http-parser)
+
+target_link_libraries(zerotier-one PRIVATE zerotiercore http_parser)
 
 target_include_directories(zerotier-one PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/opentelemetry-cpp-1.21.0/api/include"
