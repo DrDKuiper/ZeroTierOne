@@ -228,8 +228,9 @@ jobs:
         
         # Define possible locations for the GUI executable
         $possibleLocations = @(
-          "build\Release\zerotier-one.exe",
           "build\Release\zerotier-gui.exe",
+          "build\gui\Release\zerotier-gui.exe",
+          "build\Release\zerotier-one.exe",
           "build\deploy\ZeroTierOneGUI.exe",
           "build\gui\Release\ZeroTier One.exe",
           "build\gui\ZeroTier One.exe",

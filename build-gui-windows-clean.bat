@@ -36,17 +36,31 @@ cd build
 
 REM Configure CMake with Qt6
 echo Configuring with CMake...
-cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="%QT_DIR%" -G "Visual Studio 17 2022" -A x64 > cmake_config.log 2>&1
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="%QT_DIR%" -DBUILD_GUI=ON -G "Visual Studio 17 2022" -A x64 > cmake_config.log 2>&1
 
 if %ERRORLEVEL% NEQ 0 (
     echo CMake configuration failed!
     echo Configuration log:
     type cmake_config.log
+    echo.
+    echo Checking if GUI option was processed...
+    findstr /i "gui" cmake_config.log
     cd ..
     exit /b 1
 )
 
 echo CMake configuration succeeded!
+echo.
+echo Verifying GUI configuration...
+findstr /i "gui" cmake_config.log
+echo.
+echo Checking for GUI CMakeLists.txt...
+if exist "..\gui\CMakeLists.txt" (
+    echo GUI CMakeLists.txt found!
+) else (
+    echo WARNING: GUI CMakeLists.txt not found!
+)
+echo.
 
 REM Build the project
 echo Building the project...
@@ -57,11 +71,23 @@ if %ERRORLEVEL% NEQ 0 (
     echo Build log contents:
     type build_log.txt
     echo.
+    echo Checking for GUI-related errors...
+    findstr /i "gui\|qt\|error" build_log.txt
+    echo.
     call :create_fallback_exe
 ) else (
     echo Build succeeded!
     echo Generated files:
     dir /s /b *.exe 2>nul
+    echo.
+    echo Checking for GUI executable specifically...
+    if exist "gui\Release\zerotier-gui.exe" (
+        echo SUCCESS: GUI executable found at gui\Release\zerotier-gui.exe
+    ) else if exist "Release\zerotier-gui.exe" (
+        echo SUCCESS: GUI executable found at Release\zerotier-gui.exe
+    ) else (
+        echo WARNING: No GUI executable found, but build succeeded
+    )
 )
 
 REM Find the main executable
@@ -69,11 +95,14 @@ echo.
 echo Looking for executables...
 set "MAIN_EXE="
 
-if exist "Release\zerotier-one.exe" (
-    set "MAIN_EXE=Release\zerotier-one.exe"
-    echo Found: %MAIN_EXE%
-) else if exist "Release\zerotier-gui.exe" (
+if exist "Release\zerotier-gui.exe" (
     set "MAIN_EXE=Release\zerotier-gui.exe"
+    echo Found: %MAIN_EXE%
+) else if exist "gui\Release\zerotier-gui.exe" (
+    set "MAIN_EXE=gui\Release\zerotier-gui.exe"
+    echo Found: %MAIN_EXE%
+) else if exist "Release\zerotier-one.exe" (
+    set "MAIN_EXE=Release\zerotier-one.exe"
     echo Found: %MAIN_EXE%
 ) else (
     for /r . %%i in (*.exe) do (
