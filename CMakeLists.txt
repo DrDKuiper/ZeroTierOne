@@ -27,19 +27,29 @@ target_include_directories(zerotiercore PUBLIC
 # Service/daemon executable
 file(GLOB service_src_glob ${PROJ_DIR}/service/*.cpp)
 add_executable(zerotier-one ${PROJ_DIR}/one.cpp ${service_src_glob})
-target_link_libraries(zerotier-one zerotiercore)
-target_compile_options(zerotier-one PRIVATE ${ZT_DEFS})
-target_include_directories(zerotier-one PRIVATE 
-    ${PROJ_DIR}/include
-    ${PROJ_DIR}/ext
-    ${PROJ_DIR}/ext/prometheus-cpp-lite-1.0/simpleapi/include
-    ${PROJ_DIR}/ext/prometheus-cpp-lite-1.0/core/include
-    ${PROJ_DIR}/node
-    ${PROJ_DIR}/osdep
-    ${PROJ_DIR}/service
-    "${CMAKE_CURRENT_SOURCE_DIR}/ext/opentelemetry-cpp/api/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ext/opentelemetry-cpp/sdk/include"
+target_link_libraries(zerotier-one PRIVATE zerotiercore)
+
+target_include_directories(zerotier-one PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/opentelemetry-cpp-1.21.0/api/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/opentelemetry-cpp-1.21.0/sdk/include"
 )
+
+if (UNIX AND NOT APPLE)
+    # Install rules for Unix-like systems
+    install(TARGETS zerotier-one
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib/static
+    )
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+        DESTINATION include
+        FILES_MATCHING PATTERN "*.h*"
+    )
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/ext/
+        DESTINATION include
+        FILES_MATCHING PATTERN "*.h*"
+    )
+endif()
 
 # Optional GUI
 if(BUILD_GUI)
