@@ -26,10 +26,11 @@ target_include_directories(zerotiercore PUBLIC
 
 # Service/daemon executable
 file(GLOB service_src_glob ${PROJ_DIR}/service/*.cpp)
+file(GLOB osdep_src_glob ${PROJ_DIR}/osdep/*.cpp)
 add_executable(zerotier-one
     ${PROJ_DIR}/one.cpp
     ${service_src_glob}
-    ${PROJ_DIR}/osdep/OSUtils.cpp
+    ${osdep_src_glob}
     ${PROJ_DIR}/controller/EmbeddedNetworkController.cpp
     ${PROJ_DIR}/controller/CtlUtil.cpp
     ${PROJ_DIR}/controller/DB.cpp
@@ -40,7 +41,7 @@ add_executable(zerotier-one
     ${PROJ_DIR}/controller/CV1.cpp
     ${PROJ_DIR}/controller/CV2.cpp
 )
-target_link_libraries(zerotier-one PRIVATE zerotiercore)
+target_link_libraries(zerotier-one PRIVATE zerotiercore ${CMAKE_CURRENT_SOURCE_DIR}/ext/http-parser/http_parser.o)
 
 target_include_directories(zerotier-one PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/opentelemetry-cpp-1.21.0/api/include"
