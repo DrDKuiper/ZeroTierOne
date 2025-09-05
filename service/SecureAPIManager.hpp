@@ -19,6 +19,7 @@ namespace ZeroTier {
 
 /**
  * Secure API Manager for handling authentication tokens
+ * Updated: 2025-09-05 - Fixed C2660 compilation error for generateToken with 3 parameters
  */
 class SecureAPIManager
 {
@@ -30,11 +31,31 @@ public:
 	 * Generate a secure authentication token
 	 * 
 	 * @param clientId Client identifier
-	 * @param scope Token scope or permissions
+	 * @param scope Token scope or permissions  
 	 * @param expirationTime Token expiration time in seconds
 	 * @return Generated authentication token
 	 */
 	static std::string generateToken(const std::string& clientId, const std::string& scope, int expirationTime);
+
+	/**
+	 * Generate a secure authentication token (overload for different int types)
+	 * 
+	 * @param clientId Client identifier
+	 * @param scope Token scope or permissions  
+	 * @param expirationTime Token expiration time in seconds (long)
+	 * @return Generated authentication token
+	 */
+	static std::string generateToken(const std::string& clientId, const std::string& scope, long expirationTime);
+
+	/**
+	 * Generate a secure authentication token (overload for unsigned int)
+	 * 
+	 * @param clientId Client identifier
+	 * @param scope Token scope or permissions  
+	 * @param expirationTime Token expiration time in seconds (unsigned int)
+	 * @return Generated authentication token
+	 */
+	static std::string generateToken(const std::string& clientId, const std::string& scope, unsigned int expirationTime);
 
 	/**
 	 * Generate a secure authentication token (legacy version without parameters)

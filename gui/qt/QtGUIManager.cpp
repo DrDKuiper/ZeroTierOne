@@ -158,7 +158,7 @@ void MainWindow::closeEvent(QCloseEvent* event) {
 // QtGUIManager Implementation
 // =============================================================================
 
-QtGUIManager::QtGUIManager(QApplication* app) : _app(app) {
+QtGUIManager::QtGUIManager(QApplication* app) : QObject(nullptr), BaseGUIManager(), _app(app) {
     _networkManager = new QNetworkAccessManager(this);
 }
 
@@ -413,6 +413,46 @@ void QtGUIManager::makeApiCall(const QString& endpoint, std::function<void(QJson
         }
         reply->deleteLater();
     });
+}
+
+// =============================================================================
+// ZeroTier Data Methods - Delegate to BaseGUIManager
+// =============================================================================
+
+std::vector<NetworkInfo> QtGUIManager::getNetworks() const {
+    return BaseGUIManager::getNetworks();
+}
+
+std::vector<PeerInfo> QtGUIManager::getPeers() const {
+    return BaseGUIManager::getPeers();
+}
+
+bool QtGUIManager::joinNetwork(const std::string& networkId) {
+    return BaseGUIManager::joinNetwork(networkId);
+}
+
+bool QtGUIManager::leaveNetwork(const std::string& networkId) {
+    return BaseGUIManager::leaveNetwork(networkId);
+}
+
+std::string QtGUIManager::getNodeStatus() const {
+    return BaseGUIManager::getNodeStatus();
+}
+
+void QtGUIManager::setNetworkCallback(NetworkCallback callback) {
+    BaseGUIManager::setNetworkCallback(callback);
+}
+
+void QtGUIManager::setStatusCallback(StatusCallback callback) {
+    BaseGUIManager::setStatusCallback(callback);
+}
+
+void QtGUIManager::setErrorCallback(ErrorCallback callback) {
+    BaseGUIManager::setErrorCallback(callback);
+}
+
+bool QtGUIManager::connectToService() {
+    return BaseGUIManager::connectToService();
 }
 
 } // namespace ZeroTier

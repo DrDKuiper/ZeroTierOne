@@ -27,6 +27,7 @@ SecureAPIManager::~SecureAPIManager()
 {
 }
 
+// Implementation of generateToken with 3 parameters to fix C2660 error
 std::string SecureAPIManager::generateToken(const std::string& clientId, const std::string& scope, int expirationTime)
 {
 	// Generate a secure random token
@@ -44,6 +45,19 @@ std::string SecureAPIManager::generateToken(const std::string& clientId, const s
 	return tokenStream.str();
 }
 
+// Overload for long expiration time
+std::string SecureAPIManager::generateToken(const std::string& clientId, const std::string& scope, long expirationTime)
+{
+	return generateToken(clientId, scope, static_cast<int>(expirationTime));
+}
+
+// Overload for unsigned int expiration time  
+std::string SecureAPIManager::generateToken(const std::string& clientId, const std::string& scope, unsigned int expirationTime)
+{
+	return generateToken(clientId, scope, static_cast<int>(expirationTime));
+}
+
+// Legacy version without parameters
 std::string SecureAPIManager::generateToken()
 {
 	// Generate a simple secure random token for legacy compatibility

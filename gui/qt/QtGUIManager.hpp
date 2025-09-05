@@ -2,6 +2,7 @@
 #define ZEROTIER_QT_GUI_MANAGER_HPP
 
 #include "../common/GUIManager.hpp"
+#include <QObject>
 #include <QApplication>
 #include <QMainWindow>
 #include <QSystemTrayIcon>
@@ -75,7 +76,7 @@ protected:
 /**
  * Implementação Qt da GUI Manager
  */
-class QtGUIManager : public BaseGUIManager {
+class QtGUIManager : public QObject, public BaseGUIManager {
     Q_OBJECT
 
 private:
@@ -103,6 +104,21 @@ public:
     void hideMainWindow() override;
     void showNotification(const std::string& title, const std::string& message) override;
     void updateTrayIcon(const std::string& status) override;
+    
+    // Métodos de dados do ZeroTier
+    std::vector<NetworkInfo> getNetworks() const override;
+    std::vector<PeerInfo> getPeers() const override;
+    bool joinNetwork(const std::string& networkId) override;
+    bool leaveNetwork(const std::string& networkId) override;
+    std::string getNodeStatus() const override;
+    
+    // Métodos de callback
+    void setNetworkCallback(NetworkCallback callback) override;
+    void setStatusCallback(StatusCallback callback) override;
+    void setErrorCallback(ErrorCallback callback) override;
+    
+    // Método auxiliar
+    bool connectToService();
 
 private slots:
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
