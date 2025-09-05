@@ -27,9 +27,6 @@
 #include <vector>
 
 #ifdef __WINDOWS__
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
 #include <shlwapi.h>
 #include <windows.h>
 #include <winsock2.h>

@@ -20,14 +20,11 @@
 #include <string.h>
 
 #ifdef __WINDOWS__
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
 #include <IPHlpApi.h>
 #include <netioapi.h>
 #include <windows.h>
 #include <winsock2.h>
-#include <winternl.h>
+#include <ntstatus.h>
 #endif
 
 #ifdef __UNIX_LIKE__

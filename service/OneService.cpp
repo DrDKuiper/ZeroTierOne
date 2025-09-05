@@ -11,6 +11,12 @@
  */
 /****/
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#endif
+
 #include <algorithm>
 #include <condition_variable>
 #include <exception>
@@ -97,9 +103,6 @@ namespace sdkresource = opentelemetry::v1::sdk::resource;
 #endif
 
 #ifdef __WINDOWS__
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
 #include <iphlpapi.h>
 #include <netioapi.h>
 #include <shlobj.h>

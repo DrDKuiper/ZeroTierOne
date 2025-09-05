@@ -22,9 +22,6 @@
 #include <string.h>
 
 #ifdef __WINDOWS__
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
 #include <iphlpapi.h>
 #include <netioapi.h>
 #include <shlobj.h>

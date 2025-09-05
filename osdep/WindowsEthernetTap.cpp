@@ -39,9 +39,6 @@
 #include <string.h>
 #include <tchar.h>
 #include <wchar.h>
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
 #include <windows.h>
 #include <winioctl.h>
 #include <winreg.h>
