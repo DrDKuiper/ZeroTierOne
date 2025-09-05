@@ -196,7 +196,7 @@ double SecureAPIManager::getClientReputation(const std::string& client_ip) {
     return 1.0; // Default good reputation
 }
 
-size_t SecureAPIManager::getSecurityEventCount() const {
+size_t SecureAPIManager::getTotalSecurityEvents() const {
     return _security_event_count;
 }
 
@@ -205,15 +205,15 @@ size_t SecureAPIManager::getActiveTokenCount() const {
     return _active_tokens.size();
 }
 
-size_t SecureAPIManager::getRateLimitedIPsCount() const {
+std::vector<std::string> SecureAPIManager::getRateLimitedIPs() const {
     std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(_metrics_mutex));
-    size_t count = 0;
+    std::vector<std::string> ips;
     for (const auto& pair : _client_metrics) {
         if (pair.second.reputation_score < 0.5) { // Example threshold for being "rate-limited"
-            count++;
+            ips.push_back(pair.first);
         }
     }
-    return count;
+    return ips;
 }
 
 void SecureAPIManager::logSecurityEvent(const std::string& event_type,

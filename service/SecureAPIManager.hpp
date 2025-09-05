@@ -108,7 +108,7 @@ public:
     /**
      * Get total number of security events
      */
-    size_t getSecurityEventCount() const;
+    size_t getTotalSecurityEvents() const;
 
     /**
      * Get number of active tokens
@@ -116,9 +116,9 @@ public:
     size_t getActiveTokenCount() const;
 
     /**
-     * Get number of rate-limited IPs
+     * Get rate-limited IPs
      */
-    size_t getRateLimitedIPsCount() const;
+    std::vector<std::string> getRateLimitedIPs() const;
 
 private:
     std::string extractTokenFromHeader(const std::string& auth_header);

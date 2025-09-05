@@ -26,6 +26,10 @@ public:
         uint64_t currentTokens;
         uint64_t lastUpdate;
         bool enabled;
+        uint64_t uploadBytesPerSecond;
+        uint64_t downloadBytesPerSecond;
+        uint64_t burstAllowanceBytes;
+        QoSClass qosClass;
     };
 
     struct TrafficStats {
@@ -73,6 +77,16 @@ public:
      * Set bandwidth limit for a specific peer
      */
     bool setPeerLimit(const std::string& networkId, const std::string& peerId, uint64_t maxBytesPerSecond, uint64_t burstSize = 0);
+
+    /**
+     * Set network bandwidth limit (compatibility)
+     */
+    bool setNetworkBandwidthLimit(const std::string& networkId, const BandwidthLimit& limit);
+
+    /**
+     * Set peer bandwidth limit (compatibility)
+     */
+    bool setPeerBandwidthLimit(const std::string& peerId, const BandwidthLimit& limit);
 
     /**
      * Check if packet transmission is allowed (token bucket algorithm)

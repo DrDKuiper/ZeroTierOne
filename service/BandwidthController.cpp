@@ -50,18 +50,16 @@ bool BandwidthController::setNetworkLimit(const std::string& networkId, uint64_t
 
 bool BandwidthController::setPeerLimit(const std::string& networkId, const std::string& peerId, uint64_t maxBytesPerSecond, uint64_t burstSize)
 {
-    if (networkId.empty() || peerId.empty() || maxBytesPerSecond == 0) {
+    Mutex::Lock _l(_lock);
+    if (networkId.empty() || peerId.empty()) {
         return false;
     }
-
-    Mutex::Lock _l(_lock);
-    
     BandwidthLimit limit;
     limit.maxBytesPerSecond = maxBytesPerSecond;
-    limit.burstSize = (burstSize > 0) ? burstSize : (maxBytesPerSecond * DEFAULT_BURST_MULTIPLIER);
+    limit.burstSize = (burstSize > 0) ? burstSize : (uint64_t)(maxBytesPerSecond * DEFAULT_BURST_MULTIPLIER);
     limit.currentTokens = limit.burstSize;
     limit.lastUpdate = OSUtils::now();
-    limit.enabled = true;
+    limit.enabled = (maxBytesPerSecond > 0);
 
     _peerLimits[networkId][peerId] = limit;
     return true;
