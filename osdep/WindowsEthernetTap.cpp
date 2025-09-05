@@ -42,10 +42,8 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
 #include <windows.h>
+#include <winioctl.h>
 #include <winreg.h>
 #include <winsock2.h>
 #include <ws2ipdef.h>

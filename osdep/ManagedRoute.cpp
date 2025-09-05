@@ -23,13 +23,11 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
 #include <IPHlpApi.h>
 #include <netioapi.h>
 #include <windows.h>
 #include <winsock2.h>
+#include <winternl.h>
 #endif
 
 #ifdef __UNIX_LIKE__
