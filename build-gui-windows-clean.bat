@@ -51,29 +51,90 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo CMake configuration succeeded!
 echo.
-echo Verifying GUI configuration...
-findstr /i "gui" cmake_config.log
+echo === CMAKE CONFIGURATION ANALYSIS ===
+echo Checking if BUILD_GUI was processed...
+findstr /i "build_gui\|gui" cmake_config.log
 echo.
+echo Checking Qt6 detection...
+findstr /i "qt6\|found qt" cmake_config.log
+echo.
+echo Checking for GUI subdirectory processing...
+findstr /i "gui.*cmake\|subdirectory.*gui" cmake_config.log
+echo.
+echo Full CMake configuration log:
+type cmake_config.log
+echo.
+echo === PREREQUISITES CHECK ===
+call :check_gui_files
 echo Checking for GUI CMakeLists.txt...
 if exist "..\gui\CMakeLists.txt" (
-    echo GUI CMakeLists.txt found!
+    echo ✓ GUI CMakeLists.txt found
+    echo Content preview:
+    powershell -command "Get-Content '..\gui\CMakeLists.txt' | Select-Object -First 10" 2>nul || echo "Cannot preview file"
 ) else (
-    echo WARNING: GUI CMakeLists.txt not found!
+    echo ✗ WARNING: GUI CMakeLists.txt not found!
+)
+echo.
+
+REM Test Qt6 compilation before main build
+echo === QT6 COMPILATION TEST ===
+if exist "test-qt-build.bat" (
+    echo Running Qt6 compilation test...
+    call test-qt-build.bat
+    if %ERRORLEVEL% NEQ 0 (
+        echo Qt6 test failed! This indicates Qt6 setup issues.
+        echo Continuing with main build anyway...
+    ) else (
+        echo Qt6 test passed! Qt6 is working correctly.
+    )
+) else (
+    echo Qt6 test script not found, skipping test.
 )
 echo.
 
 REM Build the project
 echo Building the project...
+echo === BUILD START ===
+echo Command: cmake --build . --config Release --verbose
+echo.
 cmake --build . --config Release --verbose > build_log.txt 2>&1
+set "BUILD_EXIT_CODE=%ERRORLEVEL%"
+echo Build exit code: %BUILD_EXIT_CODE%
+echo === BUILD END ===
+echo.
 
-if %ERRORLEVEL% NEQ 0 (
-    echo Build failed! Creating fallback executable...
-    echo Build log contents:
+if %BUILD_EXIT_CODE% NEQ 0 (
+    echo Build failed! Analyzing failure...
+    echo.
+    echo === BUILD LOG ANALYSIS ===
+    echo Full build log:
     type build_log.txt
     echo.
-    echo Checking for GUI-related errors...
-    findstr /i "gui\|qt\|error" build_log.txt
+    echo === GUI/QT SPECIFIC ERRORS ===
+    findstr /i "gui\|qt\|error\|fatal" build_log.txt
     echo.
+    echo === CMAKE FILES CHECK ===
+    echo Checking if GUI CMakeLists.txt exists...
+    if exist "..\gui\CMakeLists.txt" (
+        echo ✓ GUI CMakeLists.txt exists
+    ) else (
+        echo ✗ GUI CMakeLists.txt missing
+    )
+    echo.
+    echo === QT VERIFICATION ===
+    echo QT_DIR: %QT_DIR%
+    if exist "%QT_DIR%\bin\qmake.exe" (
+        echo ✓ qmake found
+    ) else (
+        echo ✗ qmake missing
+    )
+    if exist "%QT_DIR%\lib\cmake\Qt6" (
+        echo ✓ Qt6 CMake modules found
+    ) else (
+        echo ✗ Qt6 CMake modules missing
+    )
+    echo.
+    echo Creating fallback executable...
     call :create_fallback_exe
 ) else (
     echo Build succeeded!
@@ -160,4 +221,50 @@ echo pause >> Release\zerotier-gui.bat
 
 copy Release\zerotier-gui.bat Release\zerotier-gui.exe >nul
 echo Fallback executable created at Release\zerotier-gui.exe
+goto :eof
+
+:check_gui_files
+echo Checking GUI source files...
+set "GUI_FILES_OK=1"
+
+if not exist "..\gui\main.cpp" (
+    echo ✗ gui\main.cpp missing
+    set "GUI_FILES_OK=0"
+) else (
+    echo ✓ gui\main.cpp found
+)
+
+if not exist "..\gui\qt\QtGUIManager.cpp" (
+    echo ✗ gui\qt\QtGUIManager.cpp missing
+    set "GUI_FILES_OK=0"
+) else (
+    echo ✓ gui\qt\QtGUIManager.cpp found
+)
+
+if not exist "..\gui\qt\QtGUIManager.hpp" (
+    echo ✗ gui\qt\QtGUIManager.hpp missing
+    set "GUI_FILES_OK=0"
+) else (
+    echo ✓ gui\qt\QtGUIManager.hpp found
+)
+
+if not exist "..\gui\common\BaseGUIManager.cpp" (
+    echo ✗ gui\common\BaseGUIManager.cpp missing
+    set "GUI_FILES_OK=0"
+) else (
+    echo ✓ gui\common\BaseGUIManager.cpp found
+)
+
+if not exist "..\gui\resources\icons.qrc" (
+    echo ✗ gui\resources\icons.qrc missing
+    set "GUI_FILES_OK=0"
+) else (
+    echo ✓ gui\resources\icons.qrc found
+)
+
+if "%GUI_FILES_OK%"=="1" (
+    echo ✓ All GUI source files present
+) else (
+    echo ✗ Some GUI source files missing - this may cause build failure
+)
 goto :eof

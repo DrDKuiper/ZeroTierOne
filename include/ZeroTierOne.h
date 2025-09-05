@@ -24,6 +24,12 @@
 // For the struct sockaddr_storage structure
 #if defined(_WIN32) || defined(_WIN64)
 // clang-format off
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>

@@ -32,19 +32,24 @@
 #include <newdev.h>
 #include <nldef.h>
 #include <set>
+    
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <tchar.h>
 #include <wchar.h>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #include <winreg.h>
 #include <winsock2.h>
 #include <ws2ipdef.h>
-#include <ws2tcpip.h>
-
-// Create a fake unused default route to force detection of network type on networks without gateways
+#include <ws2tcpip.h>// Create a fake unused default route to force detection of network type on networks without gateways
 #define ZT_WINDOWS_CREATE_FAKE_DEFAULT_ROUTE
 
 // Function signatures of dynamically loaded functions, from newdev.h, setupapi.h, and cfgmgr32.h

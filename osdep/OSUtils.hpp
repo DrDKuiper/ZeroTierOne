@@ -27,6 +27,12 @@
 #include <vector>
 
 #ifdef __WINDOWS__
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <shlwapi.h>
 #include <windows.h>
 #include <winsock2.h>
