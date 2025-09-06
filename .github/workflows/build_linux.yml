@@ -104,40 +104,69 @@ jobs:
     - name: Build core ZeroTier
       run: make
 
-    - name: Setup GUI build environment
-      run: |
-        chmod +x setup-gui-build.sh
-        ./setup-gui-build.sh
-
     - name: Build GUI
       run: |
-        chmod +x build-gui-linux.sh
-        ./build-gui-linux.sh
+        echo "Building GUI with CMake..."
+        
+        # Create build directory
+        mkdir -p build
+        cd build
+        
+        # Configure with CMake
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_GUI=ON
+        
+        if [ $? -ne 0 ]; then
+            echo "CMake configuration failed!"
+            exit 1
+        fi
+        
+        # Build the GUI
+        cmake --build . --config Release --target zerotier-gui -j$(nproc)
+        
+        if [ $? -ne 0 ]; then
+            echo "GUI build failed!"
+            exit 1
+        fi
+        
+        # Create deploy directory and copy executable
+        mkdir -p deploy
+        if [ -f "gui/zerotier-gui" ]; then
+            cp gui/zerotier-gui deploy/
+            echo "GUI executable created successfully"
+        elif [ -f "gui/Release/zerotier-gui" ]; then
+            cp gui/Release/zerotier-gui deploy/
+            echo "GUI executable created successfully"
+        else
+            echo "GUI executable not found!"
+            find . -name "*zerotier-gui*" -type f
+            exit 1
+        fi
+        
+        cd ..
 
     - name: Package GUI
       run: |
         mkdir -p zerotier-gui-package
         
-        # Check for AppImage first (preferred standalone format)
-        if [ -f "build/deploy/ZeroTierOneGUI.AppImage" ]; then
-          echo "Packaging standalone AppImage..."
-          cp build/deploy/ZeroTierOneGUI.AppImage zerotier-gui-package/
-          echo "Standalone AppImage created: ZeroTierOneGUI.AppImage" > zerotier-gui-package/README.txt
-          echo "This file contains all dependencies and runs on any Linux system." >> zerotier-gui-package/README.txt
-          echo "Usage: chmod +x ZeroTierOneGUI.AppImage && ./ZeroTierOneGUI.AppImage" >> zerotier-gui-package/README.txt
-        elif [ -f "build/deploy/ZeroTierOneGUI" ]; then
-          echo "Packaging standalone executable..."
-          cp build/deploy/ZeroTierOneGUI zerotier-gui-package/
-          cp gui/resources/linux/zerotier-one.desktop zerotier-gui-package/
-          cp artwork/ZeroTierIcon.png zerotier-gui-package/zerotier.png
-          echo "Standalone executable created: ZeroTierOneGUI" > zerotier-gui-package/README.txt
-          echo "May require Qt6 to be installed on target systems." >> zerotier-gui-package/README.txt
-        elif [ -f "build/gui/zerotier-gui" ]; then
-          echo "Packaging basic executable..."
-          cp build/gui/zerotier-gui zerotier-gui-package/ZeroTierOneGUI
-          cp gui/resources/linux/zerotier-one.desktop zerotier-gui-package/
-          cp artwork/ZeroTierIcon.png zerotier-gui-package/zerotier.png
-          echo "Basic executable created: ZeroTierOneGUI" > zerotier-gui-package/README.txt
+        # Check for the built executable
+        if [ -f "build/deploy/zerotier-gui" ]; then
+          echo "Packaging GUI executable..."
+          cp build/deploy/zerotier-gui zerotier-gui-package/ZeroTierOneGUI
+          
+          # Make executable
+          chmod +x zerotier-gui-package/ZeroTierOneGUI
+          
+          # Copy desktop file and icon if they exist
+          if [ -f "gui/resources/linux/zerotier-one.desktop" ]; then
+            cp gui/resources/linux/zerotier-one.desktop zerotier-gui-package/
+          fi
+          if [ -f "artwork/ZeroTierIcon.png" ]; then
+            cp artwork/ZeroTierIcon.png zerotier-gui-package/zerotier.png
+          fi
+          
+          # Create README
+          echo "ZeroTier One GUI for Linux" > zerotier-gui-package/README.txt
+          echo "Usage: ./ZeroTierOneGUI" >> zerotier-gui-package/README.txt
           echo "Requires Qt6 to be installed on target systems." >> zerotier-gui-package/README.txt
         else
           echo "Error: No GUI executable found!"

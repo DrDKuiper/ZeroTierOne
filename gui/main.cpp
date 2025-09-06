@@ -26,10 +26,10 @@ int main(int argc, char** argv) {
         ZeroTier::QtGUIManager guiManager(&app);
         
         if (!guiManager.initialize()) {
-            QMessageBox::critical(nullptr, "ZeroTier One",
-                "Failed to initialize ZeroTier One GUI.\n"
-                "Make sure the ZeroTier One service is running.");
-            return 1;
+            QMessageBox::warning(nullptr, "ZeroTier One",
+                "Failed to connect to ZeroTier One service.\n"
+                "The GUI will start in offline mode.\n"
+                "Make sure the ZeroTier One service is running for full functionality.");
         }
         
         // Mostrar notificação de inicialização
@@ -48,6 +48,12 @@ int main(int argc, char** argv) {
             QString("An error occurred: %1").arg(e.what()));
         return 1;
     }
+    catch (...) {
+        QMessageBox::critical(nullptr, "ZeroTier One",
+            "An unknown error occurred.");
+        return 1;
+    }
+}
     catch (...) {
         QMessageBox::critical(nullptr, "ZeroTier One",
             "An unknown error occurred.");

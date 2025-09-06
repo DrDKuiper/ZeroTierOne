@@ -114,27 +114,55 @@ jobs:
     - name: Build core ZeroTier
       run: make
 
-    - name: Setup GUI build environment  
-      run: |
-        chmod +x setup-gui-build.sh
-        ./setup-gui-build.sh
-
     - name: Build GUI
       run: |
-        chmod +x build-gui-macos.sh
-        ./build-gui-macos.sh
+        echo "Building GUI with CMake..."
+        
+        # Create build directory
+        mkdir -p build
+        cd build
+        
+        # Configure with CMake
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_GUI=ON -DCMAKE_PREFIX_PATH="$(brew --prefix qt6)"
+        
+        if [ $? -ne 0 ]; then
+            echo "CMake configuration failed!"
+            exit 1
+        fi
+        
+        # Build the GUI
+        cmake --build . --config Release --target zerotier-gui -j$(sysctl -n hw.ncpu)
+        
+        if [ $? -ne 0 ]; then
+            echo "GUI build failed!"
+            exit 1
+        fi
+        
+        # Create deploy directory and copy app bundle
+        mkdir -p deploy
+        if [ -d "gui/zerotier-gui.app" ]; then
+            cp -R gui/zerotier-gui.app deploy/ZeroTierOneGUI.app
+            echo "GUI app bundle created successfully"
+        elif [ -d "gui/Release/zerotier-gui.app" ]; then
+            cp -R gui/Release/zerotier-gui.app deploy/ZeroTierOneGUI.app
+            echo "GUI app bundle created successfully"
+        else
+            echo "GUI app bundle not found!"
+            find . -name "*.app" -type d
+            exit 1
+        fi
+        
+        cd ..
 
     - name: Package GUI
       run: |
-        # Package the standalone app bundle created by build script
+        # Package the app bundle created by build
         if [ -d "build/deploy/ZeroTierOneGUI.app" ]; then
           tar -cvf zerotier-gui-macos.tar build/deploy/ZeroTierOneGUI.app
-          echo "Packaged standalone app bundle: build/deploy/ZeroTierOneGUI.app"
-        elif [ -d "build/gui/ZeroTier One.app" ]; then
-          tar -cvf zerotier-gui-macos.tar build/gui/"ZeroTier One.app"
-          echo "Packaged basic app bundle: build/gui/ZeroTier One.app"
+          echo "Packaged app bundle: build/deploy/ZeroTierOneGUI.app"
         else
           echo "Error: No app bundle found!"
+          find build -name "*.app" -type d
           exit 1
         fi
 

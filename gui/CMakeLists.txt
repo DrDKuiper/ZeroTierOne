@@ -9,7 +9,10 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# Source files for the GUI
+# Define ZT_SDK to avoid automatic library linking
+add_definitions(-DZT_SDK=1)
+
+# Source files for the GUI (standalone mode)
 set(GUI_SOURCES
     main.cpp
     qt/QtGUIManager.cpp
@@ -35,17 +38,12 @@ target_link_libraries(zerotier-gui
     Qt6::Core 
     Qt6::Widgets
     Qt6::Network
-    zerotiercore
-    http_parser
 )
 
 # Include directories
 target_include_directories(zerotier-gui PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/node
-    ${CMAKE_SOURCE_DIR}/service
-    ${CMAKE_SOURCE_DIR}/osdep
 )
 
 # Platform-specific configurations
@@ -72,6 +70,13 @@ if(WIN32)
         user32
         kernel32
     )
+elseif(UNIX)
+    # Linux-specific settings
+    set_target_properties(zerotier-gui PROPERTIES
+        OUTPUT_NAME "zerotier-gui"
+    )
+    
+    # No additional libraries needed for basic Linux build
     
 elseif(APPLE)
     # macOS-specific settings

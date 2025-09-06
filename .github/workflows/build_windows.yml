@@ -161,29 +161,6 @@ jobs:
         Write-Host "Environment variables:"
         Write-Host "QT_DIR: $env:QT_DIR"
         Write-Host "Qt6_DIR: $env:Qt6_DIR"
-        Write-Host "PATH contains Qt: $($env:PATH -split ';' | Where-Object { $_ -like '*Qt*' })"
-        
-        Write-Host "Checking Qt installation..."
-        if ($env:QT_DIR -and (Test-Path "$env:QT_DIR")) {
-            Write-Host "Qt6 found at: $env:QT_DIR"
-            Get-ChildItem -Path "$env:QT_DIR\bin" -ErrorAction SilentlyContinue | Select-Object Name | Format-Table -AutoSize
-        } else {
-            Write-Host "QT_DIR not set or path does not exist!"
-            Write-Host "Available Qt installations:"
-            Get-ChildItem -Path "C:\" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*Qt*" } | Select-Object FullName
-        }
-        
-        # Setup Visual Studio environment
-        Write-Host "Setting up Visual Studio environment..."
-        $vsPath = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
-        if (-not (Test-Path $vsPath)) {
-            $vsPath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
-        }
-        if (Test-Path $vsPath) {
-            Write-Host "Found Visual Studio at: $vsPath"
-        } else {
-            Write-Host "Visual Studio not found!"
-        }
         
         # Create a proper CMake build
         Write-Host "Setting up CMake build..."
@@ -192,7 +169,7 @@ jobs:
         }
         Set-Location "build"
         
-        # Configure with CMake
+        # Configure with CMake - simplified approach
         Write-Host "Configuring with CMake..."
         $cmakeCmd = "cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_GUI=ON -G `"Visual Studio 17 2022`" -A x64"
         if ($env:QT_DIR) {
@@ -200,61 +177,84 @@ jobs:
         }
         
         Write-Host "CMake command: $cmakeCmd"
-        Invoke-Expression $cmakeCmd
+        $process = Start-Process -FilePath "cmake" -ArgumentList ($cmakeCmd -replace "cmake ", "") -Wait -PassThru -NoNewWindow -RedirectStandardOutput "cmake_out.log" -RedirectStandardError "cmake_err.log"
         
-        if ($LASTEXITCODE -eq 0) {
+        if ($process.ExitCode -eq 0) {
             Write-Host "CMake configuration successful"
+            Get-Content "cmake_out.log"
             
-            # Build the project
-            Write-Host "Building GUI with CMake..."
-            cmake --build . --config Release --target zerotier-gui --verbose
+            # Build the project - build all targets first, then GUI specifically
+            Write-Host "Building all targets..."
+            $buildProcess = Start-Process -FilePath "cmake" -ArgumentList "--build", ".", "--config", "Release" -Wait -PassThru -NoNewWindow -RedirectStandardOutput "build_out.log" -RedirectStandardError "build_err.log"
             
-            if ($LASTEXITCODE -eq 0) {
-                Write-Host "GUI build successful!"
+            Write-Host "Build output:"
+            Get-Content "build_out.log"
+            
+            if ($buildProcess.ExitCode -ne 0) {
+                Write-Host "Build errors:"
+                Get-Content "build_err.log"
                 
-                # Find the executable
-                $exeLocations = @(
-                    "gui\Release\zerotier-gui.exe",
-                    "gui\Release\ZeroTier One.exe",
-                    "Release\zerotier-gui.exe",
-                    "Release\ZeroTier One.exe"
-                )
+                # Try building GUI specifically
+                Write-Host "Trying to build GUI target specifically..."
+                $guiBuildProcess = Start-Process -FilePath "cmake" -ArgumentList "--build", ".", "--config", "Release", "--target", "zerotier-gui" -Wait -PassThru -NoNewWindow -RedirectStandardOutput "gui_build_out.log" -RedirectStandardError "gui_build_err.log"
                 
-                $found = $false
-                foreach ($location in $exeLocations) {
-                    if (Test-Path $location) {
-                        Write-Host "Found GUI executable at: $location"
-                        $found = $true
-                        
-                        # Create deploy directory
-                        if (-not (Test-Path "deploy")) {
-                            New-Item -Path "deploy" -ItemType Directory
-                        }
-                        
-                        # Copy executable
-                        Copy-Item -Path $location -Destination "deploy\zerotier-gui.exe"
-                        
-                        # Deploy Qt dependencies if windeployqt is available
-                        if ($env:QT_DIR -and (Test-Path "$env:QT_DIR\bin\windeployqt.exe")) {
-                            Write-Host "Deploying Qt dependencies..."
-                            & "$env:QT_DIR\bin\windeployqt.exe" "deploy\zerotier-gui.exe"
-                        }
-                        break
+                Write-Host "GUI build output:"
+                Get-Content "gui_build_out.log"
+                
+                if ($guiBuildProcess.ExitCode -ne 0) {
+                    Write-Host "GUI build errors:"
+                    Get-Content "gui_build_err.log"
+                    throw "GUI build failed"
+                }
+            }
+            
+            # Find the executable
+            $exeLocations = @(
+                "gui\Release\zerotier-gui.exe",
+                "gui\Release\ZeroTier One.exe",
+                "Release\zerotier-gui.exe",
+                "Release\ZeroTier One.exe"
+            )
+            
+            $found = $false
+            foreach ($location in $exeLocations) {
+                if (Test-Path $location) {
+                    Write-Host "Found GUI executable at: $location"
+                    $found = $true
+                    
+                    # Create deploy directory
+                    if (-not (Test-Path "deploy")) {
+                        New-Item -Path "deploy" -ItemType Directory
                     }
+                    
+                    # Copy executable
+                    Copy-Item -Path $location -Destination "deploy\zerotier-gui.exe"
+                    
+                    # Deploy Qt dependencies if windeployqt is available
+                    if ($env:QT_DIR -and (Test-Path "$env:QT_DIR\bin\windeployqt.exe")) {
+                        Write-Host "Deploying Qt dependencies..."
+                        try {
+                            & "$env:QT_DIR\bin\windeployqt.exe" "deploy\zerotier-gui.exe" --verbose 2
+                        } catch {
+                            Write-Host "windeployqt failed, but continuing with just the executable"
+                        }
+                    } else {
+                        Write-Host "windeployqt not found, packaging just the executable"
+                    }
+                    break
                 }
-                
-                if (-not $found) {
-                    Write-Host "GUI executable not found in expected locations"
-                    Write-Host "Available files in build directory:"
-                    Get-ChildItem -Recurse -File *.exe | Select-Object FullName
-                    throw "GUI executable not found"
-                }
-            } else {
-                Write-Host "GUI build failed"
-                throw "CMake build failed"
+            }
+            
+            if (-not $found) {
+                Write-Host "GUI executable not found in expected locations"
+                Write-Host "Available files in build directory:"
+                Get-ChildItem -Recurse -File *.exe | Select-Object FullName
+                throw "GUI executable not found"
             }
         } else {
             Write-Host "CMake configuration failed"
+            Write-Host "CMake errors:"
+            Get-Content "cmake_err.log"
             throw "CMake configuration failed"
         }
         
