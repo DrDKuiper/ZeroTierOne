@@ -30,12 +30,13 @@ set(GUI_RESOURCES
 # Create the GUI executable
 add_executable(zerotier-gui ${GUI_SOURCES} ${GUI_HEADERS} ${GUI_RESOURCES})
 
-# Link Qt6 libraries
+# Link Qt6 libraries and dependencies
 target_link_libraries(zerotier-gui 
     Qt6::Core 
     Qt6::Widgets
     Qt6::Network
     zerotiercore
+    http_parser
 )
 
 # Include directories
@@ -52,11 +53,25 @@ if(WIN32)
     # Windows-specific settings
     set_target_properties(zerotier-gui PROPERTIES
         WIN32_EXECUTABLE TRUE
-        OUTPUT_NAME "ZeroTier One"
+        OUTPUT_NAME "zerotier-gui"
     )
     
-    # Add Windows resources
-    target_sources(zerotier-gui PRIVATE resources/windows/zerotier.rc)
+    # Add Windows resources if they exist
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/windows/zerotier.rc")
+        target_sources(zerotier-gui PRIVATE resources/windows/zerotier.rc)
+    endif()
+    
+    # Windows-specific libraries
+    target_link_libraries(zerotier-gui 
+        ws2_32 
+        iphlpapi 
+        wininet 
+        netapi32
+        advapi32
+        shell32
+        user32
+        kernel32
+    )
     
 elseif(APPLE)
     # macOS-specific settings

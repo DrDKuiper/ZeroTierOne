@@ -181,93 +181,108 @@ jobs:
         }
         if (Test-Path $vsPath) {
             Write-Host "Found Visual Studio at: $vsPath"
-            cmd /c "`"$vsPath`" && set" | ForEach-Object {
-                if ($_ -match "^([^=]+)=(.*)") {
-                    [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
-                }
-            }
         } else {
             Write-Host "Visual Studio not found!"
         }
         
-        # Try building with the script
-        Write-Host "Passing QT_DIR to build script: $env:QT_DIR"
+        # Create a proper CMake build
+        Write-Host "Setting up CMake build..."
+        if (-not (Test-Path "build")) {
+            New-Item -Path "build" -ItemType Directory
+        }
+        Set-Location "build"
         
-        # Set the environment variable for the cmd process
+        # Configure with CMake
+        Write-Host "Configuring with CMake..."
+        $cmakeCmd = "cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_GUI=ON -G `"Visual Studio 17 2022`" -A x64"
         if ($env:QT_DIR) {
-            cmd /c "set QT_DIR=$env:QT_DIR && build-gui-windows-clean.bat"
-        } else {
-            Write-Host "QT_DIR not available, running script without it..."
-            .\build-gui-windows-clean.bat
+            $cmakeCmd += " -DCMAKE_PREFIX_PATH=`"$env:QT_DIR`""
         }
         
-        # If build fails, create a simple dummy executable for testing
-        if (-not (Test-Path "build\Release\zerotier-gui.exe")) {
-            Write-Host "Build script didn't produce the expected executable. Creating dummy executable..."
-            if (-not (Test-Path "build\Release")) {
-                New-Item -Path "build\Release" -ItemType Directory -Force
+        Write-Host "CMake command: $cmakeCmd"
+        Invoke-Expression $cmakeCmd
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "CMake configuration successful"
+            
+            # Build the project
+            Write-Host "Building GUI with CMake..."
+            cmake --build . --config Release --target zerotier-gui --verbose
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "GUI build successful!"
+                
+                # Find the executable
+                $exeLocations = @(
+                    "gui\Release\zerotier-gui.exe",
+                    "gui\Release\ZeroTier One.exe",
+                    "Release\zerotier-gui.exe",
+                    "Release\ZeroTier One.exe"
+                )
+                
+                $found = $false
+                foreach ($location in $exeLocations) {
+                    if (Test-Path $location) {
+                        Write-Host "Found GUI executable at: $location"
+                        $found = $true
+                        
+                        # Create deploy directory
+                        if (-not (Test-Path "deploy")) {
+                            New-Item -Path "deploy" -ItemType Directory
+                        }
+                        
+                        # Copy executable
+                        Copy-Item -Path $location -Destination "deploy\zerotier-gui.exe"
+                        
+                        # Deploy Qt dependencies if windeployqt is available
+                        if ($env:QT_DIR -and (Test-Path "$env:QT_DIR\bin\windeployqt.exe")) {
+                            Write-Host "Deploying Qt dependencies..."
+                            & "$env:QT_DIR\bin\windeployqt.exe" "deploy\zerotier-gui.exe"
+                        }
+                        break
+                    }
+                }
+                
+                if (-not $found) {
+                    Write-Host "GUI executable not found in expected locations"
+                    Write-Host "Available files in build directory:"
+                    Get-ChildItem -Recurse -File *.exe | Select-Object FullName
+                    throw "GUI executable not found"
+                }
+            } else {
+                Write-Host "GUI build failed"
+                throw "CMake build failed"
             }
-            
-            # Create a simple executable using PowerShell
-            Write-Host "Creating PowerShell-based test executable..."
-            $exeContent = 'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show("ZeroTier GUI Test Build - This is a test executable created because the main build failed.", "ZeroTier One", "OK", "Information")'
-            
-            # Create a PowerShell script
-            $exeContent | Out-File -FilePath "build\Release\zerotier-gui.ps1" -Encoding UTF8
-            
-            # Create a batch file that runs the PowerShell script
-            '@echo off' | Out-File -FilePath "build\Release\zerotier-gui.exe" -Encoding ASCII
-            'powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0zerotier-gui.ps1"' | Add-Content -Path "build\Release\zerotier-gui.exe"
-            
-            Write-Host "Test executable created successfully."
+        } else {
+            Write-Host "CMake configuration failed"
+            throw "CMake configuration failed"
         }
+        
+        Set-Location ".."
 
     - name: Package GUI
       run: |
-        Write-Host "Searching for GUI executable in multiple possible locations..."
+        Write-Host "Packaging GUI executable..."
         
-        # Define possible locations for the GUI executable
-        $possibleLocations = @(
-          "build\Release\zerotier-gui.exe",
-          "build\gui\Release\zerotier-gui.exe",
-          "build\Release\zerotier-one.exe",
-          "build\deploy\ZeroTierOneGUI.exe",
-          "build\gui\Release\ZeroTier One.exe",
-          "build\gui\ZeroTier One.exe",
-          "build\gui\Release\zerotier-gui.exe",
-          "build\gui\zerotier-gui.exe"
-        )
-        
-        # Loop through possible locations
-        $found = $false
-        foreach ($location in $possibleLocations) {
-          if (Test-Path $location) {
-            Write-Host "Found GUI executable at: $location"
-            $found = $true
+        # Check for the built executable
+        if (Test-Path "build\deploy\zerotier-gui.exe") {
+            Write-Host "Found GUI executable at: build\deploy\zerotier-gui.exe"
             
             # Create output directory if it doesn't exist
             if (-not (Test-Path "package")) {
               New-Item -Path "package" -ItemType Directory
             }
             
-            # Determine the source directory based on the found executable
-            $sourceDir = Split-Path -Parent $location
-            Write-Host "Source directory: $sourceDir"
-            
-            # Package the executable and dependencies
-            Write-Host "Packaging executable with dependencies..."
-            Copy-Item -Path "$sourceDir\*" -Destination "package" -Recurse
+            # Copy all files from deploy directory
+            Write-Host "Packaging executable with Qt dependencies..."
+            Copy-Item -Path "build\deploy\*" -Destination "package" -Recurse
             Compress-Archive -Path "package\*" -DestinationPath "zerotier-gui-windows.zip" -Force
             Write-Host "Package created: zerotier-gui-windows.zip"
-            break
-          }
-        }
-        
-        if (-not $found) {
-          Write-Host "Error: No GUI executable found in any expected location!"
-          Write-Host "Listing build directory contents for debugging:"
-          Get-ChildItem -Recurse -Path "build" -ErrorAction SilentlyContinue | Select-Object FullName
-          exit 1
+        } else {
+            Write-Host "Error: No GUI executable found!"
+            Write-Host "Listing build directory contents for debugging:"
+            Get-ChildItem -Recurse -Path "build" -ErrorAction SilentlyContinue | Select-Object FullName
+            exit 1
         }
 
     - name: Archive GUI artifacts

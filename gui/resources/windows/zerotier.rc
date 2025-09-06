@@ -12,7 +12,7 @@
 #define VER_LEGALCOPYRIGHT_STR      "Copyright © 2013-2024 ZeroTier, Inc."
 #define VER_LEGALTRADEMARKS1_STR    "All Rights Reserved"
 #define VER_LEGALTRADEMARKS2_STR    VER_LEGALTRADEMARKS1_STR
-#define VER_ORIGINALFILENAME_STR    "ZeroTier One.exe"
+#define VER_ORIGINALFILENAME_STR    "zerotier-gui.exe"
 #define VER_PRODUCTNAME_STR         "ZeroTier One"
 
 #define VER_COMPANYDOMAIN_STR       "zerotier.com"
