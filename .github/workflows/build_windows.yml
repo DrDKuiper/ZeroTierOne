@@ -45,7 +45,7 @@ jobs:
       uses: microsoft/setup-msbuild@v2
     - name: msbuild
       run: |
-        msbuild windows\ZeroTierOne.sln /m /p:Configuration=Release  /property:Platform=x64 /t:ZeroTierOne
+        msbuild windows\ZeroTierOne.sln /m /p:Configuration=Release /property:Platform=x64 /t:ZeroTierOne /p:DisableSpecificWarnings="4005"
     - name: Archive production artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -147,7 +147,7 @@ jobs:
       
     - name: Build core ZeroTier
       run: |
-        msbuild windows\ZeroTierOne.sln /m /p:Configuration=Release  /property:Platform=x64 /t:ZeroTierOne
+        msbuild windows\ZeroTierOne.sln /m /p:Configuration=Release /property:Platform=x64 /t:ZeroTierOne /p:DisableSpecificWarnings="4005"
 
     - name: Setup GUI build environment
       run: |

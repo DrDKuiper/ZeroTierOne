@@ -20,11 +20,13 @@
 #include <string.h>
 
 #ifdef __WINDOWS__
-#include <IPHlpApi.h>
-#include <netioapi.h>
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #include <winsock2.h>
-#include <ntstatus.h>
+#include <IPHlpApi.h>
+#include <netioapi.h>
 #endif
 
 #ifdef __UNIX_LIKE__
@@ -358,7 +360,7 @@ static bool _winRoute(bool del, const NET_LUID& interfaceLuid, const NET_IFINDEX
 		return (DeleteIpForwardEntry2(&rtrow) == NO_ERROR);
 	}
 	else {
-		NTSTATUS r = CreateIpForwardEntry2(&rtrow);
+		DWORD r = CreateIpForwardEntry2(&rtrow);
 		if (r == NO_ERROR) {
 			return true;
 		}
