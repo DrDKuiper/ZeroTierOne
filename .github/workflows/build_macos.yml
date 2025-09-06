@@ -44,7 +44,7 @@ jobs:
       uses: Swatinem/rust-cache@v2
       continue-on-error: false
       with:
-        key: ${{ runner.os }}-cargo-${{ hashFiles('rustybits//Cargo.lock') }}
+        key: ${{ runner.os }}-cargo-${{ hashFiles('rustybits/Cargo.lock') }}
         shared-key: ${{ runner.os }}-cargo-
         workspaces: |
           rustybits/
@@ -106,7 +106,7 @@ jobs:
       uses: Swatinem/rust-cache@v2
       continue-on-error: false
       with:
-        key: ${{ runner.os }}-cargo-${{ hashFiles('rustybits//Cargo.lock') }}
+        key: ${{ runner.os }}-cargo-${{ hashFiles('rustybits/Cargo.lock') }}
         shared-key: ${{ runner.os }}-cargo-
         workspaces: |
           rustybits/
